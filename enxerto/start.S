@@ -155,16 +155,6 @@ mmu_off_jump:
 	lsl	x13, x13, x9		/* line bytes */
 	sub	x14, x13, #1
 	dsb	sy
-	/* PROBE 1A: Blue stripe (rows 0..100) before civac_range */
-	movz	x10, #0xa800, lsl #16
-	mov	w11, #0x00ff
-	movz	x12, #0xa5e0
-	movk	x12, #0x1, lsl #16
-100:
-	str	w11, [x10], #4
-	subs	x12, x12, #1
-	b.ne	100b
-	dsb	sy
 	civac_range x3, x4
 	civac_range x5, x6
 	civac_range x7, x8
@@ -180,17 +170,6 @@ mmu_off_jump:
 	ic	iallu
 	dsb	sy
 	isb
-	/* PROBE 1B: Cyan stripe (rows 100..200) with MMU OFF right before jump */
-	movz	x10, #0xa806, lsl #16
-	movk	x10, #0x9800
-	mov	w11, #0xffff
-	movz	x12, #0xa5e0
-	movk	x12, #0x1, lsl #16
-101:
-	str	w11, [x10], #4
-	subs	x12, x12, #1
-	b.ne	101b
-	dsb	sy
 	mov	x0, x17
 	br	x16
 
