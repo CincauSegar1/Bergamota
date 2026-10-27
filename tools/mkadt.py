@@ -76,7 +76,8 @@ BOARDS = {
         compat=['xiaomi,marble', 'xiaomi,sweet', 'qcom,sm7475', 'qcom,diwali'],
         # 0-3 Cortex-A510, 4-6 Cortex-A710, 7 Cortex-X2
         cpu_compat='qcom,kryo', big_from=4, freqs=(1800000000, 2490000000),
-        mem=(0xb0000000, 0x4d000000),
+        # Safe clean DRAM bank from 0xb0000000 to 0xe0000000 (768MB); 0xe0600000+ is TrustZone/QTEE
+        mem=(0xb0000000, 0x30000000),
         gicd=0x17100000, gicr=0x17180000, gicr_size=0x200000,
         chosen_extra=[
             ('mac-address-wifi0', bytes([0x02, 0x00, 0x5e, 0x77, 0xe0, 0x02])),

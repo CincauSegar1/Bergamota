@@ -165,9 +165,6 @@ mmu_off_jump:
 	bic	x9, x9, x10
 	msr	sctlr_el1, x9
 	isb
-	civac_range x3, x4
-	civac_range x5, x6
-	civac_range x7, x8
 	dsb	sy
 	tlbi	vmalle1
 	ic	iallu

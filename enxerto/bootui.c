@@ -16,7 +16,7 @@
 #include "artdraw.h"
 
 #ifndef BOOTUI_LOG
-#define BOOTUI_LOG	0	/* logo only; the log is recorded and shown if the boot fails */
+#define BOOTUI_LOG	1	/* 1: show live log window at bottom of AMOLED screen */
 #endif
 
 #define LOG_SCALE	2

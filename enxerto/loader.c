@@ -22,6 +22,7 @@
 #include "mmu.h"
 
 #define BOOT_LINE_LENGTH	608
+#define KERNEL_BOOT_LINE_LENGTH	1024
 #define PAGE_16K		0x4000UL
 
 /*
@@ -55,7 +56,7 @@ struct boot_args {
 	uint32_t machineType;
 	uint64_t deviceTreeP;
 	uint32_t deviceTreeLength;
-	char CommandLine[BOOT_LINE_LENGTH];
+	char CommandLine[KERNEL_BOOT_LINE_LENGTH];
 	uint64_t bootFlags, memSizeActual;
 };
 
@@ -63,7 +64,8 @@ _Static_assert(__builtin_offsetof(struct payload, segs) == 0x2a8, "payload heade
 _Static_assert(sizeof(struct payload_seg) == 40, "payload segment layout");
 _Static_assert(__builtin_offsetof(struct boot_args, Video) == 40, "boot_args layout");
 _Static_assert(__builtin_offsetof(struct boot_args, CommandLine) == 108, "boot_args layout");
-_Static_assert(sizeof(struct boot_args) == 736, "boot_args layout");
+_Static_assert(__builtin_offsetof(struct boot_args, bootFlags) == 1136, "boot_args layout");
+_Static_assert(sizeof(struct boot_args) == 1152, "boot_args layout");
 
 /* MMU off: everything is Device memory, so copy in aligned 8-byte words. */
 static void copy64(uintptr_t dst, uintptr_t src, uint64_t n)
