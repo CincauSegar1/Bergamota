@@ -72,7 +72,7 @@ BOARDS = {
         bluetooth=True),
     'marble': dict(
         # Poco F5 (SM7475 / Snapdragon 7+ Gen 2): 1080x2400 AMOLED (120Hz)
-        fb=(0x9c000000, 0x1700000), fb_wh=(1080, 2400),
+        fb=(0xa8000000, 0x1700000), fb_wh=(1080, 2400),
         compat=['xiaomi,marble', 'xiaomi,sweet', 'qcom,sm7475', 'qcom,diwali'],
         # 0-3 Cortex-A510, 4-6 Cortex-A710, 7 Cortex-X2
         cpu_compat='qcom,kryo', big_from=4, freqs=(1800000000, 2490000000),
