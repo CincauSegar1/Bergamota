@@ -142,7 +142,7 @@ index 8f4c8088f971fa2b31bb8f3512d15246a81a391d..69289572d00a12f84b69611365e47c10
  #include <stdint.h>
  #include <kern/misc_protos.h>
  
--#define EARLY_FB ((volatile uint32_t *)(uintptr_t)0x9c000000)
+-#define EARLY_FB ((volatile uint32_t *)(uintptr_t)0xa8000000)
 +static volatile uint32_t *early_fb = (volatile uint32_t *)(uintptr_t)0xa8000000;
 +#define EARLY_FB early_fb
  #define EARLY_WIDTH 1080u
