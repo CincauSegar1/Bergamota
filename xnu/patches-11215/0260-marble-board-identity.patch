@@ -1,0 +1,30 @@
+diff --git a/bsd/dev/sweet_board.h b/bsd/dev/sweet_board.h
+index 597256b..6d83a12 100644
+--- a/bsd/dev/sweet_board.h
++++ b/bsd/dev/sweet_board.h
+@@ -1,8 +1,9 @@
+ /*
+- * SWEET kernels run on two Xiaomi phones. The ADT root compatible
++ * SWEET kernels run on three Xiaomi phones. The ADT root compatible
+  * (tools/mkadt.py --board) names the board; everything else is common.
+  *   xiaomi,sweet      Redmi Note 10 Pro, SM7150 (default)
+  *   xiaomi,beryllium  Poco F1, SDM845
++ *   xiaomi,marble     POCO F5, SM7475 / Snapdragon 7+ Gen 2
+  */
+ #ifndef _SWEET_BOARD_H_
+ #define _SWEET_BOARD_H_
+@@ -53,4 +54,14 @@ sweet_board_beryllium(void)
+ 	return cached == 1;
+ }
+ 
++static inline bool
++sweet_board_marble(void)
++{
++	static int cached = -1;
++	if (cached < 0) {
++		cached = (sweet_board_is("xiaomi,marble") || sweet_board_is("qcom,sm7475")) ? 1 : 0;
++	}
++	return cached == 1;
++}
++
+ #endif /* _SWEET_BOARD_H_ */

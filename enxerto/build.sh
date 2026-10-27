@@ -93,8 +93,8 @@ elif [ "$BOARD" = marble ]; then
 		--pagesize 4096 --os_version 14.0.0 --os_patch_level 2026-06 \
 		--cmdline "$CMDLINE" -o out/enxerto-boot.img
 	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk.bin \
-		--dtb "$DTB" --base 0 --kernel_offset 0x8000 --ramdisk_offset 0x1000000 \
-		--tags_offset 0x100 --dtb_offset 0x1f00000 --pagesize 4096 \
+		--dtb "$DTB" --base 0x80000000 --kernel_offset 0x00200000 --ramdisk_offset 0x02000000 \
+		--tags_offset 0x00000100 --dtb_offset 0x01f00000 --pagesize 4096 \
 		--os_version 14.0.0 --os_patch_level 2026-06 \
 		--cmdline "$CMDLINE" -o out/enxerto-boot-v2.img
 else
@@ -112,6 +112,15 @@ if [ "$BOARD" = beryllium ]; then
 		--base 0 --kernel_offset 0x8000 --ramdisk_offset 0x1000000 \
 		--tags_offset 0x100 --pagesize 4096 --os_version 16.0.0 --os_patch_level 2025-06 \
 		--cmdline "console=null bergamota.charge=1" -o out/charge-test.img
+elif [ "$BOARD" = marble ]; then
+	mkbootimg --header_version 4 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
+		--pagesize 4096 --os_version 14.0.0 --os_patch_level 2026-06 \
+		--cmdline "console=null bergamota.charge=1" -o out/charge-test.img
+	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
+		--dtb "$DTB" --base 0x80000000 --kernel_offset 0x00200000 --ramdisk_offset 0x02000000 \
+		--tags_offset 0x00000100 --dtb_offset 0x01f00000 --pagesize 4096 \
+		--os_version 14.0.0 --os_patch_level 2026-06 \
+		--cmdline "console=null bergamota.charge=1" -o out/charge-test-v2.img
 else
 	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
 		--dtb "$DTB" --base 0 --kernel_offset 0x8000 --ramdisk_offset 0x1000000 \
@@ -133,6 +142,16 @@ if [ "$BOARD" = beryllium ]; then
 		--tags_offset 0x100 --pagesize 4096 --os_version 16.0.0 --os_patch_level 2025-06 \
 		--cmdline "console=null bergamota.fastboot=1" -o out/bergamota-fastboot.img
 	# same image under the name the Mac app looks for first (the flash-capable build)
+	cp out/bergamota-fastboot.img out/bergamota-fastboot-flash.img
+elif [ "$BOARD" = marble ]; then
+	mkbootimg --header_version 4 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
+		--pagesize 4096 --os_version 14.0.0 --os_patch_level 2026-06 \
+		--cmdline "console=null bergamota.fastboot=1" -o out/bergamota-fastboot.img
+	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
+		--dtb "$DTB" --base 0x80000000 --kernel_offset 0x00200000 --ramdisk_offset 0x02000000 \
+		--tags_offset 0x00000100 --dtb_offset 0x01f00000 --pagesize 4096 \
+		--os_version 14.0.0 --os_patch_level 2026-06 \
+		--cmdline "console=null bergamota.fastboot=1" -o out/bergamota-fastboot-v2.img
 	cp out/bergamota-fastboot.img out/bergamota-fastboot-flash.img
 else
 	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk-empty.bin \

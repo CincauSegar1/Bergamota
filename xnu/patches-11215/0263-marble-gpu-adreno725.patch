@@ -1,0 +1,22 @@
+diff --git a/bsd/dev/sweet_a630.c b/bsd/dev/sweet_a630.c
+--- a/bsd/dev/sweet_a630.c
++++ b/bsd/dev/sweet_a630.c
+@@ -45,6 +45,9 @@
+ #define CHIPID_ADRENO_618	0x06010800UL
+ #define CHIPID_ADRENO_630	0x06030001UL
++#define CHIPID_ADRENO_725	0x06060201UL /* SM7475 / Poco F5 */
+ 
+ static const char *const fw_dirs[] = {
+ 	FW_DIR,
+ 	"/usr/local/share/firmware/",
++	"/usr/local/share/firmware/marble/",
++	"/usr/share/firmware/marble/"
+ };
+@@ -120,6 +123,8 @@ sweet_gpu_probe(void)
+ 	if (sweet_board_beryllium()) {
+ 		target_chip = CHIPID_ADRENO_630;
++	} else if (sweet_board_marble()) {
++		target_chip = CHIPID_ADRENO_725;
+ 	} else {
+ 		target_chip = CHIPID_ADRENO_618;
+ 	}

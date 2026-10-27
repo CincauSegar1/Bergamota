@@ -6,12 +6,12 @@
  */
 #if defined(BOARD_MARBLE)
 #define BOARD_NAME		"marble"
-/* Poco F5 (SM7475 / Snapdragon 7+ Gen 2): 1080x2400 AMOLED (fallback base in safe DDR, overridden by fdt_find_framebuffer) */
-#define FB_BASE			0xb0000000UL
+/* Poco F5 (SM7475 / Snapdragon 7+ Gen 2): 1080x2400 AMOLED (safe 144MB DDR gap at 0xa8000000) */
+#define FB_BASE			0xa8000000UL
 #define FB_W			1080
 #define FB_H			2400
-/* sm7475 imem restart_reason */
-#define IMEM_RESTART_REASON	0x146bf65cUL
+/* sm7475 imem restart_reason @ 0x146aa000 + 0x65c */
+#define IMEM_RESTART_REASON	0x146aa65cUL
 #define PSHOLD			0x0c264000UL
 #define GICD_BASE		0x17100000UL
 #define GICR_BASE		0x17180000UL

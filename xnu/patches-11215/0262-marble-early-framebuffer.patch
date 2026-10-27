@@ -1,0 +1,40 @@
+diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
+--- a/osfmk/arm64/start.s
++++ b/osfmk/arm64/start.s
+@@ -108,12 +108,17 @@
+ 	/*
+-	 * Early white band on sweet's 0x9c000000 splash. Disabled when the
+-	 * bootloader or ADT selects marble (0xa8000000 safe DDR gap).
++	 * Early white band on sweet's 0x9c000000 splash. Bypassed on
++	 * marble (SM7475) to avoid triggering a Synchronous External Abort
++	 * against Qualcomm TrustZone protected modem memory.
+ 	 */
+-	movz	x0, #0x9c9c, lsl #16
+-	movk	x0, #0x1800
+-	mov	w1, #0xffffffff
+-	mov	w2, #216000
+-1:	str	w1, [x0], #4
+-	subs	w2, w2, #1
+-	b.ne	1b
++	/* Early white-band loop NOPed out on marble */
++	nop
++	nop
++	nop
++	nop
+ 
+ 	/*
+@@ -150,7 +155,7 @@
+ 	 * Identity map the early framebuffer at 0xa8000000 for marble
+ 	 * instead of 0x9c000000 (modem carveout).
+ 	 */
+-	movz	x1, #0x9c00, lsl #16
++	movz	x1, #0xa800, lsl #16
+ 	orr	x1, x1, #(ARM_PTE_TYPE_BLOCK | ARM_TTE_VALID)
+diff --git a/osfmk/arm64/arm_vm_init.c b/osfmk/arm64/arm_vm_init.c
+--- a/osfmk/arm64/arm_vm_init.c
++++ b/osfmk/arm64/arm_vm_init.c
+@@ -340,7 +340,7 @@ arm_vm_init(uint64_t mem_size, boot_args *args)
+ 	 * Map safe early framebuffer region at 0xa8000000 for marble
+ 	 */
+-	pmap_map_early_device(0x9c000000UL, 0x01800000UL);
++	pmap_map_early_device(0xa8000000UL, 0x01800000UL);

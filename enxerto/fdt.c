@@ -157,7 +157,9 @@ uintptr_t fdt_find_framebuffer(uintptr_t fdt)
 		case FDT_BEGIN_NODE: {
 			const char *name = (const char *)p;
 			depth++;
-			if (streq(name, "framebuffer") || starts(name, "framebuffer@"))
+			if (streq(name, "framebuffer") || starts(name, "framebuffer@") ||
+			    starts(name, "cont_splash") || starts(name, "splash_region") ||
+			    starts(name, "non_secure_display"))
 				in_fb = depth;
 			p = align4(skip_str(p));
 			break;
