@@ -76,7 +76,7 @@ index 69289572d00a12f84b69611365e47c102c576db4..ec4affddc142f6bbfd90e59a29513957
  #include <stdint.h>
  #include <kern/misc_protos.h>
  
--static volatile uint32_t *early_fb = (volatile uint32_t *)(uintptr_t)0x9c000000;
+-static volatile uint32_t *early_fb = (volatile uint32_t *)(uintptr_t)0xa8000000;
 +/*
 + * start.s and arm_vm_init map one 32MB block at 0x9c000000. It holds the
 + * splash framebuffer of both boards (sweet 0x9c000000 1080x2400, Poco F1
