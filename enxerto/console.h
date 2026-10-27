@@ -17,6 +17,7 @@
 
 extern volatile uint32_t *con_fb;
 
+void con_set_fb(uintptr_t fb);
 void con_clear(uint32_t bg);
 /* The background text rows and log windows are drawn on, without clearing (screens that paint their own ground). */
 void con_set_bg(uint32_t bg);

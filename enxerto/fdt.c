@@ -136,6 +136,60 @@ static int starts(const char *s, const char *p)
 	return !*p;
 }
 
+uintptr_t fdt_find_framebuffer(uintptr_t fdt)
+{
+	uint64_t base = 0;
+	if (fdt_chosen_u64(fdt, "qcom,cont-splash-mem", &base) && base)
+		return (uintptr_t)base;
+	if (fdt_chosen_u64(fdt, "framebuffer-base", &base) && base)
+		return (uintptr_t)base;
+
+	if (!fdt || be32(fdt) != FDT_MAGIC)
+		return 0;
+	uintptr_t p = fdt + be32(fdt + 8);
+	uintptr_t strings = fdt + be32(fdt + 12);
+	int depth = 0, in_fb = 0;
+
+	for (;;) {
+		uint32_t tok = be32(p);
+		p += 4;
+		switch (tok) {
+		case FDT_BEGIN_NODE: {
+			const char *name = (const char *)p;
+			depth++;
+			if (streq(name, "framebuffer") || starts(name, "framebuffer@"))
+				in_fb = depth;
+			p = align4(skip_str(p));
+			break;
+		}
+		case FDT_END_NODE:
+			if (in_fb == depth)
+				in_fb = 0;
+			depth--;
+			break;
+		case FDT_PROP: {
+			uint32_t len = be32(p), nameoff = be32(p + 4);
+			uintptr_t val = p + 8;
+			const char *pn = (const char *)(strings + nameoff);
+			if (in_fb && streq(pn, "reg")) {
+				if (len >= 8) {
+					uint64_t addr = len >= 16 ?
+						((uint64_t)be32(val) << 32 | be32(val + 4)) :
+						be32(val);
+					return (uintptr_t)addr;
+				}
+			}
+			p = align4(val + len);
+			break;
+		}
+		case FDT_NOP:
+			break;
+		default:
+			return 0;
+		}
+	}
+}
+
 static void copy_str(char *d, const char *s, int max)
 {
 	int i = 0;

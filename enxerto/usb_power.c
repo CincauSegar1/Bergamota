@@ -107,6 +107,10 @@ static const uint16_t phy_seq[][2] = {
 
 int usb_power_up(void)
 {
+#if defined(BOARD_MARBLE)
+	/* ABL already initializes USB on SM7475. GCC offsets differ from SDM845. */
+	return 0;
+#else
 	uint32_t gd = rd(GCC + USB30_GDSCR), m = rd(GCC + MASTER_CBCR), n = rd(GCC + CFG_NOC_CBCR);
 
 	if (alive()) {
@@ -166,4 +170,5 @@ int usb_power_up(void)
 	uint32_t id = rd(DWC3_GSNPSID);
 	con_hex2("USBPWR", "powered, gsnpsid=", id, "gdsc=", rd(GCC + USB30_GDSCR));
 	return (id >> 16) == 0x5533 ? 1 : -3;
+#endif
 }

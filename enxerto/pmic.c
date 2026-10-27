@@ -94,6 +94,11 @@ static uint16_t find_apid(unsigned ppid)
 
 int pmic_init(void)
 {
+#if defined(BOARD_MARBLE)
+	/* SM7475 uses PM7325 / PMK7325 PMICs, not PMI8998. Skip legacy SPMI polling. */
+	sp_ready = 0;
+	return -1;
+#else
 	uint32_t ver = rd(SP_CORE);
 
 	sp_count = rd(SP_CORE + 4) & 0x7ff;
@@ -103,6 +108,7 @@ int pmic_init(void)
 	}
 	sp_ready = 1;
 	return 0;
+#endif
 }
 
 /* Read allow-list: only the blocks this screen needs (same as the kernel's whitelist plus PON). */

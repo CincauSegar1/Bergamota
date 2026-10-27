@@ -378,6 +378,9 @@ void enxerto_main(uint64_t dtb)
 {
 	struct mmu_info mi;
 
+	/* Initialize console framebuffer dynamically from ABL live FDT */
+	con_set_fb(fdt_find_framebuffer(dtb));
+
 	/*
 	 * Fast charging from the very first moment (charger.c): ABL leaves the PMI8998 on its slow defaults.
 	 * Re-checked from the fastboot / charging loops, handed back to the kernel in loader_boot_payload.

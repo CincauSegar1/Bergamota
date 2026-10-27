@@ -47,6 +47,12 @@ static void hist_newline(void)
 		hist_ch[l][i] = 0;
 }
 
+void con_set_fb(uintptr_t fb)
+{
+	if (fb)
+		con_fb = (volatile uint32_t *)fb;
+}
+
 void con_set_bg(uint32_t bg)
 {
 	con_bg = bg;
