@@ -220,6 +220,24 @@ const char *loader_boot_payload(uintptr_t rd_start, uintptr_t rd_end, int verify
 	const struct payload *p = (const struct payload *)rd_start;
 	if (rd_end < rd_start + 8 || !magic_ok(p->magic))
 		return "no SWEETXNU payload";
+
+	/*
+	 * Protect against ABL loading Image inside the framebuffer region (e.g. on Poco F5 / marble
+	 * where ABL places Image at 0xa8000000, which is the display cont_splash_region).
+	 * Drawing the boot UI before relocating the payload overwrites kernel code with pixels!
+	 * Relocate the payload to safe unreserved DDR (0xa3000000) before any pixels are drawn.
+	 */
+	uint64_t fb_start = FB_BASE;
+	uint64_t fb_end = FB_BASE + (uint64_t)FB_STRIDE * FB_H;
+	if (rd_start < fb_end && rd_end > fb_start) {
+		uintptr_t safe_rd = 0xa3000000UL;
+		uint64_t rd_size = (rd_end - rd_start + 7) & ~7UL;
+		copy64(safe_rd, rd_start, rd_size);
+		rd_start = safe_rd;
+		rd_end = safe_rd + rd_size;
+		p = (const struct payload *)rd_start;
+	}
+
 	/* A real payload: switch to the branded boot screen (con_* output becomes its log window). */
 	bootui_init();
 	bootui_progress(PM_INITRD, "INITRD FOUND");
