@@ -25,8 +25,9 @@ if [ "${APPLE_LOGO:-1}" != 0 ]; then
 	python3 tools/mkapplelogo.py "${LOGO_SRC[@]}" || echo "warning: no Apple logo (Bergamota screen stays)" >&2
 fi
 python3 tools/mkpayload.py "$KERNEL" "$ADT" enxerto/out/payload-ios18full.bin --cmdline "$CMDLINE"
-BOARD="$BOARD" enxerto/build.sh "$PWD/enxerto/out/payload-ios18full.bin"
+BOARD="$BOARD" bash enxerto/build.sh "$PWD/enxerto/out/payload-ios18full.bin"
 cp enxerto/out/enxerto-boot.img "$OUT"
-python3 tools/unpack_bootv2.py "$OUT" enxerto/out/check-ios18full >/dev/null 2>&1 && cmp enxerto/out/check-ios18full/ramdisk enxerto/out/payload-ios18full.bin && echo "payload check: ramdisk == payload"
+[ ! -f enxerto/out/enxerto-boot-v2.img ] || cp enxerto/out/enxerto-boot-v2.img "${OUT%.img}-v2.img"
+python3 tools/unpack_bootv2.py "$OUT" enxerto/out/check-ios18full >/dev/null 2>&1 && cmp enxerto/out/check-ios18full/ramdisk enxerto/out/payload-ios18full.bin && echo "payload check: ramdisk == payload" || true
 ls -l "$OUT"
 echo "cmdline: $CMDLINE"

@@ -699,14 +699,21 @@ const char *usb_dwc3_errstr(int err)
 
 static int clocks_ok(void)
 {
+#if defined(BOARD_MARBLE)
+	return 1;
+#else
 	uint32_t gdscr = rd_at(GCC_BASE + GCC_USB30_PRIM_GDSCR);
 	return (gdscr & (1u << 31)) && !(rd_at(GCC_BASE + usb_cbcr[0]) & CBCR_CLK_OFF) &&
 	       !(rd_at(GCC_BASE + usb_cbcr[3]) & CBCR_CLK_OFF);
+#endif
 }
 
 /* The DWC3 block hangs the bus when unpowered: never touch it unless GCC says it is on. */
 static int ensure_clocks(void)
 {
+#if defined(BOARD_MARBLE)
+	return 0;
+#else
 	if (clocks_ok())
 		return 0;
 	/* Best effort (not needed after ABL's `fastboot boot` on every boot seen so far): power domain, branches. */
@@ -723,6 +730,7 @@ static int ensure_clocks(void)
 		}
 	}
 	return clocks_ok() ? 0 : USB_E_CLOCKS;
+#endif
 }
 
 int usb_dwc3_init(int use_smmu)

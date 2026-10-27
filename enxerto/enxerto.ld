@@ -16,6 +16,9 @@ SECTIONS
 	. = ALIGN(4096);
 	_sec_stacks = .;
 	. += 8 * 0x1000;
+	. = ALIGN(4096);
+	.payload : { *(.payload) }
+	. = ALIGN(4096);
 	_end = .;
 	/DISCARD/ : { *(.comment) *(.note*) *(.eh_frame*) }
 }

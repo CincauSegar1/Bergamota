@@ -151,22 +151,60 @@ const char *loader_check(uintptr_t rd_start, uintptr_t rd_end)
 	return 0;
 }
 
+extern char _head[], _end[];
+extern char _payload_start[], _payload_end[];
+
+static int find_initrd(uintptr_t dtb, uint64_t *rd_start, uint64_t *rd_end)
+{
+	/* 1. Embedded payload in monolithic Image (guaranteed to be loaded by ABL on GKI / Header v4) */
+	if (magic_ok(_payload_start)) {
+		*rd_start = (uintptr_t)_payload_start;
+		*rd_end = (uintptr_t)_payload_end;
+		return 1;
+	}
+
+	/* 2. Check DTB /chosen */
+	if ((fdt_chosen_u64(dtb, "linux,initrd-start", rd_start) ||
+	     fdt_chosen_u64(dtb, "initrd-start", rd_start) ||
+	     fdt_chosen_u64(dtb, "qcom,initrd-start", rd_start)) &&
+	    (fdt_chosen_u64(dtb, "linux,initrd-end", rd_end) ||
+	     fdt_chosen_u64(dtb, "initrd-end", rd_end) ||
+	     fdt_chosen_u64(dtb, "qcom,initrd-end", rd_end)) &&
+	    *rd_end >= *rd_start + 8) {
+		if (magic_ok((const char *)*rd_start))
+			return 1;
+	}
+
+	/* Check memory immediately following Enxerto Image */
+	uintptr_t p = ((uintptr_t)_end + 4095) & ~4095UL;
+	if (magic_ok((const char *)p)) {
+		*rd_start = p;
+		*rd_end = p + 64 * 1024 * 1024;
+		return 1;
+	}
+
+	/* Scan DRAM for "SWEETXNU" */
+	uintptr_t base = (uintptr_t)_head & ~0x1ffffffUL;
+	for (uintptr_t a = base; a < base + 0x10000000; a += 4096) {
+		if (magic_ok((const char *)a)) {
+			*rd_start = a;
+			*rd_end = a + 64 * 1024 * 1024;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 int loader_has_payload(uintptr_t dtb)
 {
 	uint64_t rd_start, rd_end;
-
-	if (!fdt_chosen_u64(dtb, "linux,initrd-start", &rd_start) ||
-	    !fdt_chosen_u64(dtb, "linux,initrd-end", &rd_end) || rd_end < rd_start + 8)
-		return 0;
-	return magic_ok((const char *)rd_start);
+	return find_initrd(dtb, &rd_start, &rd_end);
 }
 
 const char *loader_boot(uintptr_t dtb)
 {
 	uint64_t rd_start, rd_end;
-
-	if (!fdt_chosen_u64(dtb, "linux,initrd-start", &rd_start) ||
-	    !fdt_chosen_u64(dtb, "linux,initrd-end", &rd_end))
+	if (!find_initrd(dtb, &rd_start, &rd_end))
 		return "no initrd in /chosen";
 	return loader_boot_payload(rd_start, rd_end, 0);
 }

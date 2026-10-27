@@ -57,6 +57,17 @@ for f in $SRCS; do
 	$CC $CFLAGS -c $f -o out/${f%.*}.o
 	OBJS="$OBJS out/${f%.*}.o"
 done
+
+# Prepare embedded payload if provided
+rm -f out/payload.bin
+if [ -n "${1:-}" ] && [ -s "$1" ]; then
+	cp "$1" out/payload.bin
+	$CC $CFLAGS -DEMBED_PAYLOAD=1 -c payload.S -o out/payload.o
+else
+	touch out/payload.bin
+	$CC $CFLAGS -c payload.S -o out/payload.o
+fi
+OBJS="$OBJS out/payload.o"
 # The image runs wherever ABL puts it with no relocation pass: only the
 # header's image_size (start.o, linked at 0) may be an absolute address.
 abs=$($READELF -r ${OBJS//out\/start.o/} | grep -c ABS64 || true)
@@ -88,11 +99,12 @@ if [ "$BOARD" = beryllium ]; then
 		--tags_offset 0x100 --pagesize 4096 --os_version 16.0.0 --os_patch_level 2025-06 \
 		--cmdline "$CMDLINE" -o out/enxerto-boot.img
 elif [ "$BOARD" = marble ]; then
-	# Header v4 (Poco F5 / SM7475 stock layout) and Header v2 (for fastboot boot)
-	mkbootimg --header_version 4 --kernel out/Image --ramdisk out/ramdisk.bin \
+	# Header v4 (Poco F5 / SM7475 stock layout): ramdisk is empty because payload is embedded in Image
+	(cd out && rm -rf rd && mkdir rd && cd rd && find . | cpio -o -H newc --quiet | gzip -9 > ../ramdisk-empty.bin)
+	mkbootimg --header_version 4 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
 		--pagesize 4096 --os_version 14.0.0 --os_patch_level 2026-06 \
 		--cmdline "$CMDLINE" -o out/enxerto-boot.img
-	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk.bin \
+	mkbootimg --header_version 2 --kernel out/Image --ramdisk out/ramdisk-empty.bin \
 		--dtb "$DTB" --base 0x80000000 --kernel_offset 0x00200000 --ramdisk_offset 0x02000000 \
 		--tags_offset 0x00000100 --dtb_offset 0x01f00000 --pagesize 4096 \
 		--os_version 14.0.0 --os_patch_level 2026-06 \
