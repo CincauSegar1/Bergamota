@@ -90,33 +90,7 @@ diff --git a/osfmk/arm64/start.s b/osfmk/arm64/start.s
 index 637617a4b463e3193b909d76cea363783106fa61..73c168d0c8ecc43624f7e360487a4b659e44ddcc 100644
 --- a/osfmk/arm64/start.s
 +++ b/osfmk/arm64/start.s
-@@ -472,6 +472,25 @@ LEXT(start_first_cpu)
- 	mov		x20, x0
- 	mov		x21, #0
- 
-+#if defined(SWEET)
-+	/* Stage 0: white 64x32 band, no stack or page tables needed. */
-+	MOV64	x0, (0xa8000000 + 2368 * 4320)
-+	mov		w1, #-1
-+	mov		x2, #32
-+	mov		x4, #4320
-+Lsweet_mark_row:
-+	mov		x3, #64
-+	mov		x5, x0
-+Lsweet_mark_pixel:
-+	str		w1, [x5], #4
-+	subs	x3, x3, #1
-+	b.ne	Lsweet_mark_pixel
-+	add		x0, x0, x4
-+	subs	x2, x2, #1
-+	b.ne	Lsweet_mark_row
-+	dsb		sy
-+#endif
-+
- 	// Set low reset vector before attempting any loads
- 	adrp	x0, EXT(LowExceptionVectorBase)@page
- 	add		x0, x0, EXT(LowExceptionVectorBase)@pageoff
-@@ -618,6 +637,23 @@ Lkernelcache_base_found:
+@@ -618,6 +618,23 @@ Lkernelcache_base_found:
  	lsr		x5,  x24, #(ARM_TT_L2_SHIFT)
  	create_bootstrap_mapping x14, x15, x5, x3, x2, x9, x10, x11, x12, x13
  
