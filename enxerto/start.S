@@ -154,11 +154,32 @@ mmu_off_jump:
 	mov	x13, #4
 	lsl	x13, x13, x9		/* line bytes */
 	sub	x14, x13, #1
-	dsb	sy
+#if defined(BOARD_MARBLE)
+	/* Indicator 1: CYAN bar across rows 30-60 before civac */
+	movz	x10, #0xa801, lsl #16
+	movk	x10, #0xfa00
+	movz	w11, #0xffff
+	movz	x12, #32400
+1:	str	w11, [x10], #4
+	subs	x12, x12, #1
+	b.ne	1b
+#endif
+	dsb	nsh
 	civac_range x3, x4
 	civac_range x5, x6
 	civac_range x7, x8
-	dsb	sy
+	dsb	nsh
+#if defined(BOARD_MARBLE)
+	/* Indicator 2: MAGENTA bar across rows 60-90 after civac */
+	movz	x10, #0xa803, lsl #16
+	movk	x10, #0xf400
+	movz	w11, #0x00ff
+	movk	w11, #0x00ff, lsl #16
+	movz	x12, #32400
+2:	str	w11, [x10], #4
+	subs	x12, x12, #1
+	b.ne	2b
+#endif
 	mrs	x9, sctlr_el1
 	mov	x10, #((1 << 0) | (1 << 2))	/* M, C */
 	orr	x10, x10, #(1 << 12)		/* I */
@@ -171,13 +192,14 @@ mmu_off_jump:
 	dsb	nsh
 	isb
 #if defined(BOARD_MARBLE)
-	/* Draw bright RED bar across rows 0-30 on marble framebuffer 0xa8000000 */
-	movz	x10, #0xa800, lsl #16
+	/* Indicator 3: RED bar across rows 90-120 with MMU OFF */
+	movz	x10, #0xa805, lsl #16
+	movk	x10, #0xee00
 	movz	w11, #0x00ff, lsl #16
 	movz	x12, #32400
-10:	str	w11, [x10], #4
+3:	str	w11, [x10], #4
 	subs	x12, x12, #1
-	b.ne	10b
+	b.ne	3b
 #endif
 	mov	x0, x17
 	br	x16
