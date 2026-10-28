@@ -176,6 +176,18 @@ mmu_off_jump:
 	ic	iallu
 	dsb	nsh
 	isb
+#if defined(BOARD_MARBLE)
+	/* Probe 1: Solid WHITE bar (rows 600..800) right before br x16 */
+	movz	x10, #0xa827, lsl #16
+	movk	x10, #0x8c00
+	movz	w11, #0xffff
+	movk	w11, #0xffff, lsl #16
+	movz	x12, #0x4bc0
+	movk	x12, #0x3, lsl #16
+10:	str	w11, [x10], #4
+	subs	x12, x12, #1
+	b.ne	10b
+#endif
 	mov	x0, x17
 	br	x16
 
