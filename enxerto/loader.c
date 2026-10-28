@@ -341,7 +341,7 @@ const char *loader_boot_payload(uintptr_t rd_start, uintptr_t rd_end, int verify
 	con_hex("JUMP", entry_pa);
 	bootui_progress(1000, "STARTING IOS");
 	enxerto_charger_handoff();	/* the kernel's sweetcharger=2 finds the charger registers as ABL left them */
-	con_str("XNU", "JUMPING BUILD-1450-PANFIX");
+	con_str("XNU", "JUMPING BUILD-1500-CLEAN");
 	bootui_handoff();
 
 	/* Clean to memory, MMU and caches off, invalidate, jump (also right when mmu_rc failed). */
