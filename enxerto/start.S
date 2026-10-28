@@ -165,11 +165,20 @@ mmu_off_jump:
 	bic	x9, x9, x10
 	msr	sctlr_el1, x9
 	isb
-	dsb	sy
+	dsb	nsh
 	tlbi	vmalle1
 	ic	iallu
-	dsb	sy
+	dsb	nsh
 	isb
+#if defined(BOARD_MARBLE)
+	/* Draw bright RED bar across rows 0-30 on marble framebuffer 0xa8000000 */
+	movz	x10, #0xa800, lsl #16
+	movz	w11, #0x00ff, lsl #16
+	movz	x12, #32400
+10:	str	w11, [x10], #4
+	subs	x12, x12, #1
+	b.ne	10b
+#endif
 	mov	x0, x17
 	br	x16
 
