@@ -131,6 +131,16 @@ exc_common:
  * mmu_off_jump(entry, arg, ranges[3] = {lo, hi} x 3): see mmu.h. The ranges
  * are loaded into registers first; after that nothing touches memory.
  */
+	.macro	cvac_range lo, hi
+	bic	x15, \lo, x14
+1:	cmp	x15, \hi
+	b.hs	2f
+	dc	cvac, x15
+	add	x15, x15, x13
+	b	1b
+2:
+	.endm
+
 	.macro	civac_range lo, hi
 	bic	x15, \lo, x14
 1:	cmp	x15, \hi
@@ -147,40 +157,14 @@ mmu_off_jump:
 	mov	x16, x0			/* entry */
 	mov	x17, x1			/* arg */
 	ldp	x3, x4, [x2, #0]
-	ldp	x5, x6, [x2, #16]
-	ldp	x7, x8, [x2, #32]
 	mrs	x9, ctr_el0		/* DminLine: log2 words */
 	ubfx	x9, x9, #16, #4
 	mov	x13, #4
 	lsl	x13, x13, x9		/* line bytes */
 	sub	x14, x13, #1
-#if defined(BOARD_MARBLE)
-	/* Indicator 1: Opaque CYAN bar across rows 30-60 before civac (0xff00ffff) */
-	movz	x10, #0xa801, lsl #16
-	movk	x10, #0xfa00
-	movz	w11, #0xffff
-	movk	w11, #0xff00, lsl #16
-	movz	x12, #32400
-1:	str	w11, [x10], #4
-	subs	x12, x12, #1
-	b.ne	1b
-#endif
 	dsb	nsh
-	civac_range x3, x4
-	civac_range x5, x6
-	civac_range x7, x8
+	cvac_range x3, x4
 	dsb	nsh
-#if defined(BOARD_MARBLE)
-	/* Indicator 2: Opaque MAGENTA bar across rows 60-90 after civac (0xffff00ff) */
-	movz	x10, #0xa803, lsl #16
-	movk	x10, #0xf400
-	movz	w11, #0x00ff
-	movk	w11, #0xffff, lsl #16
-	movz	x12, #32400
-2:	str	w11, [x10], #4
-	subs	x12, x12, #1
-	b.ne	2b
-#endif
 	mrs	x9, sctlr_el1
 	mov	x10, #((1 << 0) | (1 << 2))	/* M, C */
 	orr	x10, x10, #(1 << 12)		/* I */
@@ -192,17 +176,6 @@ mmu_off_jump:
 	ic	iallu
 	dsb	nsh
 	isb
-#if defined(BOARD_MARBLE)
-	/* Indicator 3: Opaque RED bar across rows 90-120 with MMU OFF (0xffff0000) */
-	movz	x10, #0xa805, lsl #16
-	movk	x10, #0xee00
-	movz	w11, #0x0000
-	movk	w11, #0xffff, lsl #16
-	movz	x12, #32400
-3:	str	w11, [x10], #4
-	subs	x12, x12, #1
-	b.ne	3b
-#endif
 	mov	x0, x17
 	br	x16
 
