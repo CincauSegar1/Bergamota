@@ -148,8 +148,8 @@ void marble_touch_entry(void) {
     sweet_hid_touch_fn hid_touch = (sweet_hid_touch_fn)SWEET_HID_TOUCH_ADDR;
     printf_fn kprint = (printf_fn)PRINTF_ADDR;
 
-    // Initial stabilization delay (2 seconds)
-    delay(2000, 1000000);
+    // Fast stabilization delay (100ms)
+    delay(100, 1000000);
 
     kprint("SWEET TOUCH: initializing Marble Goodix GT9916R on SPI...\n");
 
@@ -171,11 +171,11 @@ void marble_touch_entry(void) {
     gpio_set(tlmm, PIN_CLK, 0);
     gpio_set(tlmm, PIN_MOSI, 0);
 
-    // Pulse reset: low 10ms, high 50ms
+    // Fast pulse reset: low 5ms, high 20ms
     gpio_set(tlmm, PIN_RESET, 0);
-    delay(10, 1000000);
+    delay(5, 1000000);
     gpio_set(tlmm, PIN_RESET, 1);
-    delay(50, 1000000);
+    delay(20, 1000000);
 
     // Read Version (0x10014, 28 bytes)
     uint8_t version[28];
