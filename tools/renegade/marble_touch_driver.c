@@ -38,7 +38,7 @@ typedef int (*sweet_spmi_read_fn)(unsigned sid, unsigned addr, uint8_t *out);
 #define SWEET_HID_TOUCH_ADDR  0xfffffe0007b5a28cULL
 #define SWEET_HID_KEY_ADDR    0xfffffe0007b5a1a0ULL
 #define PRINTF_ADDR           0xfffffe00073a31d0ULL
-#define SWEET_SPMI_READ_ADDR  0xfffffe000758670cULL
+#define SWEET_SPMI_READ_ADDR  0xfffffe000758270cULL
 
 #define TLMM_PHYS             0x0f000000ULL
 #define TLMM_SIZE             0x20000ULL
@@ -119,7 +119,7 @@ static bool goodix_read(struct marble_touch_ctx *ctx, uint32_t address, uint8_t 
         spi_transfer_byte(ctx, tx[i], 0);
     }
     for (uint32_t i = 0; i < length; i++) {
-        spi_transfer_byte(ctx, 0, &data[i]);
+        spi_transfer_byte(ctx, 0xff, &data[i]);
     }
     spi_delay();
     gpio_set(ctx->tlmm, PIN_CS, 1);
@@ -286,14 +286,17 @@ void marble_touch_entry(void) {
         // 1. Native Hardware Power & Volume Keys via Qualcomm SPMI PMK8350 PON
         if (spmi_read) {
             uint8_t pon_sts = 0;
-            if (spmi_read(0, 0x0810, &pon_sts) == 0) {
-                bool pwr_down = (pon_sts & 1) != 0;
+            // PMK8350 PON generation 3: slave 0, address 0x1310 (REG_RT_STATUS)
+            // Bit 7 (0x80) = KPDPWR (Power Key)
+            // Bit 6 (0x40) = RESIN (Volume Down Key)
+            if (spmi_read(0, 0x1310, &pon_sts) == 0) {
+                bool pwr_down = (pon_sts & 0x80) != 0;
                 if (pwr_down != pwr_prev) {
                     pwr_prev = pwr_down;
                     hid_key(0, pwr_down ? 1 : 0);
                     kprint("SWEET KEY: hardware power button %s\n", pwr_down ? "DOWN" : "UP");
                 }
-                bool voldown = (pon_sts & 2) != 0;
+                bool voldown = (pon_sts & 0x40) != 0;
                 if (voldown != voldn_prev) {
                     voldn_prev = voldown;
                     hid_key(2, voldown ? 1 : 0);
