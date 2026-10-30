@@ -182,6 +182,12 @@ PATCHES = (
      'IOPMrootDomain::handleSetDisplayPowerOn: nop cbz (ignore display power-off requests)'),
     (0xb4726c, bytes.fromhex('ff0302d1'), bytes.fromhex('c0035fd6'),
      'AppleCLCD::blackout: return immediately (never wipe framebuffer to black)'),
+    (0xb4d0d8, bytes.fromhex('17913e39'), bytes.fromhex('1f913e39'),
+     'IOMobileFramebufferUserClient::externalMethod: strb wzr, [x8, #0xfa4] (never set fPowerOff to 1, inhibit screen blackout)'),
+    (0xb53788,
+     bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
+     bytes.fromhex('c109805202ea81520300805204008052050080520600805207008052'),
+     '_SweetBattery::poll: 78% 3920mV 0mA external=0 charging=0 (discharging, remove fake lightning bolt)'),
 )
 
 
@@ -196,6 +202,14 @@ def main():
             raise SystemExit(f'{src}: {off:#x}: expected {old.hex()}, got {got.hex()} ({what})')
         data[off:off + len(new)] = new
         print(f'{off:#x}: {what}')
+
+    # Inject native Marble touch & gesture engine into _touch_thread (0x330e9c)
+    touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'touch_engine.bin')
+    if os.path.exists(touch_bin):
+        touch_code = open(touch_bin, 'rb').read()
+        touch_off = 0x330e9c
+        data[touch_off:touch_off + len(touch_code)] = touch_code
+        print(f'{touch_off:#x}: injected Marble touch & gesture engine ({len(touch_code)} bytes)')
 
     open(dst, 'wb').write(data)
     print(f'wrote {dst} ({len(data)} bytes)')
