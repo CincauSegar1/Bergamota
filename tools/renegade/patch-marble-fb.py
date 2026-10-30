@@ -149,6 +149,11 @@ PATCHES = (
      '_hfs_getnewvnode: line 946 nop b.hi (bypass logicalSize > cf_blocks check)'),
     (0x853df0, bytes.fromhex('0d010054'), bytes.fromhex('0b010054'),
      '_MapFileBlockC: line 628 b.lt instead of b.le (allow tmpOff == 0 at extent boundary, bypass EINVAL)'),
+    (0x87bf3c, bytes.fromhex('ff8301d1'), bytes.fromhex('c0035fd6'),
+     '_hfs_generate_volume_notifications: return immediately (disable VeryLowDisk/LowDisk flags and VFS signal)'),
+    (0x892f10, bytes.fromhex('ff8301d1fa6701a9f85f02a9f65703a9'),
+     bytes.fromhex('00d842b94000003500008252c0035fd6'),
+     '_hfs_freeblks: ldr w0, [x0, #0x2d8]; cbnz w0, #8; mov w0, #0x1000; ret (bypass reserveBlocks clamp, prevent ENOSPC/Code 640)'),
     (0x511918, bytes.fromhex('1f500071'), bytes.fromhex('c0035fd6'),
      '_sweet_early_mark: return immediately (eliminate bottom debug color blocks)'),
 )
