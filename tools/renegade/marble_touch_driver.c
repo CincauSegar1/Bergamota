@@ -1,6 +1,6 @@
 /*
  * Marble Touch Driver: Goodix GT9916R (Berlin-D) SPI Touchscreen for Poco F5 (SM7475)
- * Direct XNU Kernel Integration via SweetHIDTouch / IOHIDEventService.
+ * Direct XNU Kernel Integration via SweetHIDTouch / IOHIDEventService & SweetHIDButtons.
  *
  * Bus: Cape QUPv3 SE4 SPI
  * Pins:
@@ -11,12 +11,15 @@
  *   GPIO 20: RESET (Active Low)
  *   GPIO 21: IRQ / INT (Falling edge / Low on contact)
  *
- * Cape TLMM GPIO Bank: 0x0f100000 (SM7475 Cape PINCTRL REG_BASE)
+ * Cape TLMM GPIO Bank: 0x0f000000 (SM7475 Cape PINCTRL REG_BASE, marble DTS line 912)
  *
  * NOTE: This driver is injected into the read-only __TEXT_EXEC segment (_touch_thread).
  * ALL state variables MUST reside exclusively on the execution stack. ZERO writes to
  * static/global data (.bss / .data) are allowed, as any static write causes a data abort
  * ("SWEET EARLY PANIC: Unexpected fault in kernel static region").
+ *
+ * INVARIANT: marble_touch_entry MUST NEVER RETURN (no ret). Thread continuation in XNU
+ * has no caller return frame; returning causes kernel instruction fetch abort.
  */
 
 #include <stdint.h>
@@ -25,14 +28,16 @@
 typedef void *(*ml_io_map_fn)(uint64_t phys_addr, uint64_t size);
 typedef void (*delay_fn)(uint32_t interval, uint32_t unit_in_ns);
 typedef void (*sweet_hid_touch_fn)(int finger, int down, int x, int y);
+typedef void (*sweet_hid_key_fn)(int key, int down);
 typedef int (*printf_fn)(const char *fmt, ...);
 
 #define ML_IO_MAP_ADDR        0xfffffe00075236ccULL
 #define DELAY_ADDR            0xfffffe00073742a4ULL
 #define SWEET_HID_TOUCH_ADDR  0xfffffe0007b5a28cULL
+#define SWEET_HID_KEY_ADDR    0xfffffe0007b5a1a0ULL
 #define PRINTF_ADDR           0xfffffe00073a31d0ULL
 
-#define TLMM_PHYS             0x0f100000ULL
+#define TLMM_PHYS             0x0f000000ULL
 #define TLMM_SIZE             0x20000ULL
 
 #define PIN_MISO_DEFAULT      16
@@ -142,7 +147,7 @@ static bool goodix_write(struct marble_touch_ctx *ctx, uint32_t address, const u
 }
 
 static inline uint16_t le16(const uint8_t *p) {
-    return (uint16_t)(p[0] | ((uint16_t)p[1] << 8));
+    return (uint16_t)p[0] | ((uint16_t)p[1] << 8);
 }
 
 static inline uint32_t le32(const uint8_t *p) {
@@ -160,6 +165,7 @@ void marble_touch_entry(void) {
     ml_io_map_fn ml_io_map = (ml_io_map_fn)ML_IO_MAP_ADDR;
     delay_fn delay = (delay_fn)DELAY_ADDR;
     sweet_hid_touch_fn hid_touch = (sweet_hid_touch_fn)SWEET_HID_TOUCH_ADDR;
+    sweet_hid_key_fn hid_key = (sweet_hid_key_fn)SWEET_HID_KEY_ADDR;
     printf_fn kprint = (printf_fn)PRINTF_ADDR;
 
     struct marble_touch_ctx ctx;
@@ -169,12 +175,14 @@ void marble_touch_entry(void) {
     // Fast stabilization delay (100ms)
     delay(100, 1000000);
 
-    kprint("SWEET TOUCH: initializing Marble Goodix GT9916R on Cape SPI...\n");
+    kprint("SWEET TOUCH: initializing Marble Goodix GT9916R on Cape SPI (TLMM 0x%08llx)...\n", TLMM_PHYS);
 
     ctx.tlmm = (volatile uint32_t *)ml_io_map(TLMM_PHYS, TLMM_SIZE);
     if (!ctx.tlmm) {
         kprint("SWEET TOUCH: failed to map Cape TLMM at 0x%08llx!\n", TLMM_PHYS);
-        return;
+        while (1) {
+            delay(1000, 1000000);
+        }
     }
 
     // Configure GPIO pins
@@ -304,6 +312,14 @@ void marble_touch_entry(void) {
 
         goodix_write(&ctx, touch_address, &zero, 1);
 
+        // Power button gesture: 3 or more fingers tap triggers power toggle (sleep/wake)
+        if (count >= 3) {
+            hid_key(0, 1);
+            delay(40, 1000000);
+            hid_key(0, 0);
+            kprint("SWEET TOUCH: 3-finger power toggle dispatched!\n");
+        }
+
         bool active[10];
         for (int i = 0; i < 10; i++) active[i] = false;
 
@@ -323,6 +339,14 @@ void marble_touch_entry(void) {
             uint32_t mapped_y = (raw_y * 2436) / 2400;
             if (mapped_x > 1125) mapped_x = 1125;
             if (mapped_y > 2436) mapped_y = 2436;
+
+            // Top-right corner tap gesture (x > 950 && y < 100) triggers power toggle
+            if (count == 1 && raw_x > 950 && raw_y < 100 && !prev_contacts[id].down) {
+                hid_key(0, 1);
+                delay(40, 1000000);
+                hid_key(0, 0);
+                kprint("SWEET TOUCH: top-right corner power toggle dispatched!\n");
+            }
 
             active[id] = true;
             prev_contacts[id].x = mapped_x;
@@ -347,5 +371,10 @@ void marble_touch_entry(void) {
             }
         }
         report_count++;
+    }
+
+    // Safety fallback: NEVER return to avoid uninitialized lr instruction abort
+    while (1) {
+        delay(1000, 1000000);
     }
 }
