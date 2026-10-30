@@ -128,13 +128,15 @@ void con_text(int x, int y, int scale, int spacing, uint32_t fg, const char *s)
 		glyph(x, y, scale, *s, fg);
 }
 
+#define LOG_MAX_X	380
+
 void con_window(int y_px, int rows)
 {
 	base_y = y_px;
 	win_rows = rows;
 	row = 0;
 	if (rows > 0)
-		con_rect(0, base_y, FB_W, rows * CH_H, con_bg);
+		con_rect(0, base_y, LOG_MAX_X, rows * CH_H, con_bg);
 }
 
 static void next_row(void)
@@ -144,7 +146,7 @@ static void next_row(void)
 	if (win_rows > 0) {
 		if (row >= win_rows)
 			row = 0;
-		con_rect(0, base_y + row * CH_H, FB_W, CH_H, con_bg);	/* wipe the line about to be written */
+		con_rect(0, base_y + row * CH_H, LOG_MAX_X, CH_H, con_bg);	/* wipe the line about to be written */
 	}
 }
 
@@ -159,7 +161,7 @@ static void put_char(int col, char ch, uint32_t fg)
 		fg = fg == LABEL ? 0xffffcfc4U : 0xfff4f3ecU;
 	if (win_rows < 0)
 		return;
-	if (x0 + CH_W > FB_W || y0 + CH_H > FB_H)
+	if (x0 + CH_W > LOG_MAX_X || y0 + CH_H > FB_H)
 		return;
 	for (int gy = 0; gy < 16; gy++)
 		for (int gx = 0; gx < 8; gx++) {
