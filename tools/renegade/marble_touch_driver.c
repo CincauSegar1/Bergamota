@@ -8,11 +8,10 @@
  *   GPIO 17: MISO (qup0_se4 pad 1)
  *   GPIO 18: CLK  (qup0_se4 pad 2)
  *   GPIO 19: CS   (qup0_se4 pad 3, Active Low)
- *   GPIO 20: RESET (Active Low, held HIGH)
+ *   GPIO 20: RESET (Kept HIGH by ABL; NEVER touched to avoid OLED blanking/reset)
  *   GPIO 21: IRQ / INT (Falling edge / Low on contact)
  *
  * Cape TLMM GPIO Bank: 0x0f000000 (SM7475 Cape PINCTRL REG_BASE)
- * PMK8350 SPMI Core: 0x0c400000, PON status SID 0 addr 0x0810 (Bit 0 = Power Key)
  *
  * NOTE: This driver is injected into the read-only __TEXT_EXEC segment (_touch_thread).
  * ALL state variables MUST reside exclusively on the execution stack. ZERO writes to
@@ -31,14 +30,12 @@ typedef void (*delay_fn)(uint32_t interval, uint32_t unit_in_ns);
 typedef void (*sweet_hid_touch_fn)(int finger, int down, int x, int y);
 typedef void (*sweet_hid_key_fn)(int key, int down);
 typedef int (*printf_fn)(const char *fmt, ...);
-typedef int (*sweet_spmi_read_fn)(unsigned sid, unsigned addr, uint8_t *out);
 
 #define ML_IO_MAP_ADDR        0xfffffe00075236ccULL
 #define DELAY_ADDR            0xfffffe00073742a4ULL
 #define SWEET_HID_TOUCH_ADDR  0xfffffe0007b5a28cULL
 #define SWEET_HID_KEY_ADDR    0xfffffe0007b5a1a0ULL
 #define PRINTF_ADDR           0xfffffe00073a31d0ULL
-#define SWEET_SPMI_READ_ADDR  0xfffffe000758670cULL
 
 #define TLMM_PHYS             0x0f000000ULL
 #define TLMM_SIZE             0x20000ULL
@@ -47,7 +44,6 @@ typedef int (*sweet_spmi_read_fn)(unsigned sid, unsigned addr, uint8_t *out);
 #define PIN_MISO_DEFAULT      17
 #define PIN_CLK               18
 #define PIN_CS                19
-#define PIN_RESET             20
 #define PIN_INT               21
 
 #define GOODIX_STATUS_TOUCH   0x80
@@ -170,18 +166,17 @@ void marble_touch_entry(void) {
     sweet_hid_touch_fn hid_touch = (sweet_hid_touch_fn)SWEET_HID_TOUCH_ADDR;
     sweet_hid_key_fn hid_key = (sweet_hid_key_fn)SWEET_HID_KEY_ADDR;
     printf_fn kprint = (printf_fn)PRINTF_ADDR;
-    sweet_spmi_read_fn spmi_read = (sweet_spmi_read_fn)SWEET_SPMI_READ_ADDR;
 
     struct marble_touch_ctx ctx;
     ctx.pin_mosi = PIN_MOSI_DEFAULT; // 16
     ctx.pin_miso = PIN_MISO_DEFAULT; // 17
 
-    // Hardware button state trackers
-    bool pwr_prev = false;
-    bool voldn_prev = false;
-
-    // Fast stabilization delay (100ms)
-    delay(100, 1000000);
+    // 15-second stabilization delay: wait for launchd, tzinit, and display server
+    // to complete early boot initialization before touching TLMM or polling SPI.
+    kprint("SWEET TOUCH: waiting 15s for early boot stabilization...\n");
+    for (int s = 0; s < 15; s++) {
+        delay(1000, 1000000);
+    }
 
     kprint("SWEET TOUCH: initializing Marble Goodix GT9916R on Cape SPI (TLMM 0x%08llx)...\n", TLMM_PHYS);
 
@@ -193,16 +188,16 @@ void marble_touch_entry(void) {
         }
     }
 
-    // Configure GPIO pins for Cape SPI SE4 + Goodix TS
+    // Configure GPIO pins for Cape SPI SE4 + Goodix TS.
+    // Invariant: NEVER configure or set GPIO 20 (PIN_RESET). ABL keeps it HIGH.
+    // Setting OE on GPIO 20 pulses active-low RESET, discharging the OLED panel
+    // charge pump (producing a white flash -> black screen -> PMIC watchdog trip).
     gpio_cfg(ctx.tlmm, ctx.pin_mosi, 0, 0, 6, true);  // pin 16: MOSI out
     gpio_cfg(ctx.tlmm, ctx.pin_miso, 0, 3, 6, false); // pin 17: MISO in, pull-up
     gpio_cfg(ctx.tlmm, PIN_CLK, 0, 0, 6, true);        // pin 18: CLK out
     gpio_cfg(ctx.tlmm, PIN_CS, 0, 3, 16, true);        // pin 19: CS out, pull-up
-    gpio_cfg(ctx.tlmm, PIN_RESET, 0, 3, 8, true);      // pin 20: RESET out, pull-up
     gpio_cfg(ctx.tlmm, PIN_INT, 0, 3, 8, false);       // pin 21: IRQ in, pull-up
 
-    // Keep RESET held HIGH at all times! (Do not toggle low to avoid wiping running firmware)
-    gpio_set(ctx.tlmm, PIN_RESET, 1);
     gpio_set(ctx.tlmm, PIN_CS, 1);
     gpio_set(ctx.tlmm, PIN_CLK, 0);
     gpio_set(ctx.tlmm, ctx.pin_mosi, 0);
@@ -283,29 +278,7 @@ void marble_touch_entry(void) {
         delay(8, 1000000); // 8ms sleep = 125 Hz
         idle_ticks++;
 
-        // 1. Native Hardware Power & Volume Keys via Qualcomm SPMI PMK8350 PON
-        if (spmi_read) {
-            uint8_t pon_sts = 0;
-            // PMK8350 PON generation 3: slave 0, address 0x1310 (REG_RT_STATUS)
-            // Bit 7 (0x80) = KPDPWR (Power Key)
-            // Bit 6 (0x40) = RESIN (Volume Down Key)
-            if (spmi_read(0, 0x1310, &pon_sts) == 0) {
-                bool pwr_down = (pon_sts & 0x80) != 0;
-                if (pwr_down != pwr_prev) {
-                    pwr_prev = pwr_down;
-                    hid_key(0, pwr_down ? 1 : 0);
-                    kprint("SWEET KEY: hardware power button %s\n", pwr_down ? "DOWN" : "UP");
-                }
-                bool voldown = (pon_sts & 0x40) != 0;
-                if (voldown != voldn_prev) {
-                    voldn_prev = voldown;
-                    hid_key(2, voldown ? 1 : 0);
-                    kprint("SWEET KEY: hardware vol- button %s\n", voldown ? "DOWN" : "UP");
-                }
-            }
-        }
-
-        // 2. Touch Screen Polling
+        // Touch Screen Polling
         bool irq_active = !gpio_get(ctx.tlmm, PIN_INT);
         if (!irq_active && (idle_ticks < 10)) {
             // No touch interrupt and not at 80ms watchdog tick
@@ -369,12 +342,27 @@ void marble_touch_entry(void) {
             if (mapped_x > 1125) mapped_x = 1125;
             if (mapped_y > 2436) mapped_y = 2436;
 
-            // Top-right corner tap gesture (x > 950 && y < 100) triggers power toggle
-            if (count == 1 && raw_x > 950 && raw_y < 100 && !prev_contacts[id].down) {
-                hid_key(0, 1);
-                delay(40, 1000000);
-                hid_key(0, 0);
-                kprint("SWEET TOUCH: top-right corner power toggle dispatched!\n");
+            // Virtual button gestures:
+            // Top-right corner tap (x > 950 && y < 100): Power toggle (sleep/wake)
+            // Top-left corner tap (x < 120 && y < 100): Volume Up
+            // Bottom-left corner tap (x < 120 && y > 2300): Volume Down
+            if (count == 1 && !prev_contacts[id].down) {
+                if (raw_x > 950 && raw_y < 100) {
+                    hid_key(0, 1);
+                    delay(40, 1000000);
+                    hid_key(0, 0);
+                    kprint("SWEET TOUCH: top-right corner power toggle dispatched!\n");
+                } else if (raw_x < 120 && raw_y < 100) {
+                    hid_key(1, 1);
+                    delay(40, 1000000);
+                    hid_key(1, 0);
+                    kprint("SWEET TOUCH: top-left corner vol+ dispatched!\n");
+                } else if (raw_x < 120 && raw_y > 2300) {
+                    hid_key(2, 1);
+                    delay(40, 1000000);
+                    hid_key(2, 0);
+                    kprint("SWEET TOUCH: bottom-left corner vol- dispatched!\n");
+                }
             }
 
             active[id] = true;
