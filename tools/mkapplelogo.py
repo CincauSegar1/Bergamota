@@ -116,7 +116,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", help="iOS root sparse image (read with tools/renegade/hfsx.py)")
     ap.add_argument("--png", help="an already extracted apple-logo CgBI/RGBA PNG")
-    ap.add_argument("--size", type=int, default=390, help="edge in px (iPhone XR 150 pt logo at this panel's ~2.6 px/pt)")
+    ap.add_argument("--width", type=int, default=None, help="width in px")
+    ap.add_argument("--height", type=int, default=None, help="height in px")
+    ap.add_argument("--size", type=int, default=None, help="edge in px (iPhone XR 150 pt logo at this panel's ~2.6 px/pt)")
     ap.add_argument("--out", default=os.path.join(HERE, "..", "enxerto", "applelogo.h"))
     ap.add_argument("--preview")
     a = ap.parse_args()
@@ -128,9 +130,30 @@ def main():
         tmp = tempfile.mkdtemp()
         png = os.path.join(tmp, "logo.png")
         subprocess.run([sys.executable, os.path.join(HERE, "renegade", "hfsx.py"), a.root, "get", INROOT, png], check=True)
-    w, h, cov = read_cgbi(png)
-    cov = bilinear(w, h, cov, a.size, a.size)
-    W = H = a.size
+
+    try:
+        from PIL import Image
+        use_pil = True
+    except ImportError:
+        use_pil = False
+
+    if use_pil and png and os.path.exists(png):
+        im = Image.open(png).convert("L")
+        if a.width and a.height:
+            im = im.resize((a.width, a.height), Image.Resampling.LANCZOS)
+        W, H = im.size
+        cov = bytearray(im.tobytes())
+    else:
+        w, h, cov = read_cgbi(png)
+        if a.width and a.height:
+            cov = bilinear(w, h, cov, a.width, a.height)
+            W, H = a.width, a.height
+        elif a.size:
+            cov = bilinear(w, h, cov, a.size, a.size)
+            W = H = a.size
+        else:
+            W, H = w, h
+
     rle = bytearray()
     for y in range(H):
         rle += rle_row(cov[y * W:(y + 1) * W])

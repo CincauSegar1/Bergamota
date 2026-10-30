@@ -3,6 +3,7 @@
  * /chosen (initrd location). Big-endian, 4-byte aligned tokens.
  */
 #include "fdt.h"
+#include "board.h"
 
 #define FDT_MAGIC	0xd00dfeed
 #define FDT_BEGIN_NODE	1
@@ -138,6 +139,9 @@ static int starts(const char *s, const char *p)
 
 uintptr_t fdt_find_framebuffer(uintptr_t fdt)
 {
+#if defined(BOARD_MARBLE)
+	return FB_BASE;
+#else
 	uint64_t base = 0;
 	if (fdt_chosen_u64(fdt, "qcom,cont-splash-mem", &base) && base)
 		return (uintptr_t)base;
@@ -190,6 +194,7 @@ uintptr_t fdt_find_framebuffer(uintptr_t fdt)
 			return 0;
 		}
 	}
+#endif
 }
 
 static void copy_str(char *d, const char *s, int max)

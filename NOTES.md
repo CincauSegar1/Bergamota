@@ -2,6 +2,12 @@
 
 ## Agent handoff / active work (2026-10-27, latest)
 
+### 2026-10-28: "stuck at XNU JUMPING" was a framebuffer cache bug (build 1845-NCFB)
+- Symptom: screen freezes on `XNU JUMPING` and none of the new diagnostic bars appear, even though the CPU may keep running.
+- Cause: on marble ABL loads the boot Image so its tail (the embedded payload at Image offset 0xd1000) overlaps `cont_splash` at `0xa8000000`, so `_head.._end` covers most of the framebuffer's 32MB L2 block. `mmu_enable_ranges()` then split/overwrote that block as Normal write-back, replacing the Normal-non-cacheable mapping set for `FB_PHYS`. Every boot-screen/log write after `MMU ON` was therefore cached; the last status line and the `start.S` bars stayed dirty in the D-cache and were lost when `mmu_off_jump` disabled it. `mmu_off_jump` also only cleaned `r[0]` (kernel), never the image/payload ranges.
+- Fix: `enxerto/mmu.c` skips the framebuffer block when applying write-back ranges (it stays Normal-NC); `enxerto/start.S` `mmu_off_jump` now clean+invalidates all three ranges (kernel, payload, image/stack) before turning the MMU/caches off.
+- Image: `enxerto-boot-marble-boot.img` (banner `BUILD-1845-NCFB`), deployed to `/storage/emulated/0`, `Download/`, `tempatsimpenuntukmarble/`. Next: flash and photograph the bars. White=entered mmu_off_jump, green=kernel+payload+image cleaned, red=MMU off, blue=about to branch; yellow at rows 1200-1250 is XNU's first instruction (physical write). If only white shows, the hang is inside the first `dsb sy`; if yellow shows, XNU entry is reached and the next blocker is inside start.s/arm_init.
+
 ### >>> POCO F5 (`marble`, SM7475 / Snapdragon 7+ Gen 2) PORT INITIATED: docs/MARBLE_PORT.md <<<
 - Target transition from Poco F1 (`beryllium`) to Poco F5 (`marble`).
 - Hardware parameters extracted from official Qualcomm SM7475 Diwali DTB (`dtb/marble/dtb`):
@@ -650,3 +656,227 @@ What it took today (in order): 0058 HID services (Apple IOHIDFamily-1915 user cl
 **2026-10-23 ~12:25: 🌳 iOS 18 ON HEARTWOOD xnu-11215.** `uname`: Darwin 24.3.0, xnu-11215.81.4. Image shim-boot-xnu11215-full3.img, branch xnu11215, CI run 39976128381 (commit 0ce6e39), RAM boot via Bergamota, same userdata root as with 0160. The series is in `xnu/patches-11215/` (see docs/XNU11215_MIGRATION.md). Boot fixes needed on hardware: 0171 SweetCPU. In 11215 `processor_start` is a no-op for kexts, `ml_processor_register` boots the CPU, and `processor_cpu_reinit` already calls `ml_cpu_up`. Result: 8 CPUs online; SpringBoard, backboardd, lsd and PosterBoard running; SSH up. Open items: the ADT identity reports iPhone10,3 (it should be iPhone11,8). 0137/0140 (sweetreboot) are ported (86f87ec) but not in that build.
 
 **2026-10-23: rebrand.** The project is the Bergamota Project. Its parts are **Bergamota** (the macOS control plane, `apps/Bergamota`, now also on develop), **Enxerto** (the bootloader, `shim/` renamed to `enxerto/`; build output `enxerto/out/enxerto-boot.img`), **Heartwood** (the kernel, `xnu/patches`) and **Renegade** (the arm64e to arm64 patcher plus the root build, `tools/ios18` renamed to `tools/renegade`, with the CLI `tools/renegade/renegade`). Identifiers inside the code are unchanged: the boot-args (`sweet*`), the kernel file name (`kernel.development.sweet`), the CI artifact `xnu-kernel` and the data folder `research/ios18`. Bergamota lists both `enxerto/out` and the old `shim/out`. Older entries below use the old paths.
+
+**2026-10-28 ~19:02: marble hang moved to PAYLOAD OK -> DSU barrier.** With the FB block kept Normal-NC (no
+write-back remap of 0xa8000000), the panel now shows the true last line: the loader stops at `PAYLOAD OK`,
+i.e. inside `mmu_enable_ranges()` (between the 70% mark and `MMU ON`), not at the XNU jump. That function still
+used `dsb sy` in `dcache_inval_range()` and after `ic iallu`, which on this DSU can wait on the offline secondary
+cores (same class of stall as the old `dsb ish`). Changed every `dsb sy` in mmu.c/start.S/loader.c to `dsb nsh`
+(the handoff path already used nsh). Banner now `BUILD-1910-NSH`; the pre-MMU status reads `PAYLOAD OK 1910-NSH`
+so a photo at the hang identifies the image even before the XNU line. Verified the built ELF: all `dsb` in
+mmu_enable_ranges, mmu_off_jump and mmu_off_ret are `nsh`. Deployed v4+v2 to /storage/emulated/0/,
+Download/ and tempatsimpenuntukmarble/.
+
+**2026-10-28 ~19:30: marble PAYLOAD OK regression fixed (BUILD-1930-RVT).** The 1845/1910 hang at
+`PAYLOAD OK` was the FB-block skip itself: on marble the Image is loaded at ~0xa8000000 and
+`_head.._end` (0xa8000000..0xa923c000) is entirely inside L2 block 0x54, so `continue`-ing that
+block left the image/vectors mapped NC+PXN/UXN (execute-never) -> fault on the first fetch after
+SCTLR.M. Reverted that skip; the image block is WB again (1755 reached `MMU rc=0 l3=4` + JUMP this
+way). Also corrected the FB address assumption: the boot UI draws to the live-FDT
+`qcom,cont-splash-mem` (`con_fb`), not the hardcoded 0xa8000000, so the bars, the green handoff bar
+and `ba->Video.v_baseAddr` now use `con_fb`; the loader logs `FB <addr>`. `mmu_off_jump` takes the
+FB base as a 4th arg (x3 -> x19) and the four bars are now actually visible. Kept `dsb nsh`.
+Banner `BUILD-1930-RVT`, status `PAYLOAD OK 1930-RVT`. Deployed v4+v2 to all three folders.
+
+**2026-10-28 ~20:10: marble FB/ADT moved to the live splash (BUILD-2010-MFB).** The kernel was still built
+for the beryllium splash: three spots hardcode 0xa8000000, but on marble ABL moves the splash to
+0xb8000000 (the v4 boot image is loaded at 0xa8000000). They are `_start_first_cpu`'s bootstrap L3 block
+(`movk x10,#0xa800,lsl#16`, kernel file 0x51c300), `arm_vm_init`/`sweet_early_map_final`'s final Normal-NC
+kernel alias (`movk x8,#0xa800`, file 0x510538), and `_early_fb`'s initial value (file 0xc51f70). The alias
+is the one that matters after `sweet_early_relocate`: it mapped the reserved VA to PA 0xa8000000 (the dead
+boot image), so the early-console glyphs and stage bars went there while the DPU kept scanning 0xb8000000.
+`tools/renegade/patch-marble-fb.py` rewrites all three to 0xb8000000; verified in the built payload. The
+deployed ADT was also stale: it still had `virtual-timer-intid=0x13` (19) and no `redistributor-stride`.
+Regenerated `dtb/marble/marble-hi-3x.adt` (`--board marble --display-scale 3`) now has
+`virtual-timer-intid=0x1b` (27), `redistributor-stride=0x40000`, and `sweet-fbcon reg=0xb8000000` (what
+`fbcon_probe` maps for the serial console). Built v4 with the patched kernel + new ADT (banner `2010-MFB`), deployed to all three
+folders (v4 sha256 `7ecb37c9…`, v2 `2aa61add…`). Next: flash `enxerto-boot-marble-boot.img` and photograph.
+Observation: the kernel early console (stages 1-20, `sweetearlyfb=1` is in the cmdline) should now be
+visible on the panel and show where it stops. Guess (unverified): the stale `vtimer_intid=19` may also have
+stalled timer setup, so the new ADT could be a second fix.
+
+**2026-10-28 ~21:05: marble early panic in `_current_percpu_base` fixed (BUILD-2010-MFB).** Flashed the
+2010-MFB v4: the early console is finally visible and panics with `Synchronous exception ... SP1 selected`
+at `pc 0xfffffe00075107e0` = `_current_percpu_base+0xc`, `far=0x200`, `esr=0x96000006` (data abort, DFSC=6
+translation fault level 2, read), `x0=0`; disasm is `bl _current_thread; ldr x8,[x0,#0x200]`, so
+`TPIDR_EL1` was 0. Static call graph: `arm_init` calls `PE_init_platform` (mark 2) before
+`thread_bootstrap`/`machine_set_current_thread` (mark 4), and `PE_init_platform -> pe_arm_init_interrupts
+-> kprintf -> usimple_lock_try -> hw_lock_try -> __prepare_preemption_disable_measurement ->
+current_percpu_base()`. Fix: `tools/renegade/patch-marble-fb.py` now also patches `_current_percpu_base`
+(kernel file 0x50c7d4) to `mrs x0,TPIDR_EL1; cbz x0,->0; ldr/asr/ret; mov x0,#0; ret`, i.e. return 0 (the
+boot CPU's valid per-CPU offset, since callers add it to the per-CPU base) when no thread exists yet.
+Verified the patched disasm and the bytes in the payload. Rebuilt v4+v2 (v4 sha256 `0e8e9b7f…`, v2
+`55f08be7…`) and deployed to all three folders. Next: flash `enxerto-boot-marble-boot.img`; a new panic
+means we are past the early kprintf/lock path. Final check on the deployed files: both v4 and v2 contain
+the patched pattern at image offset 0x5debc4 and the original pattern is absent. The panic registers
+(`x23=0xfffffe0007522908` = `_ml_parse_cpu_topology`, `x28=0xa80b1000`) point at a PE/platform caller,
+consistent with `PE_init_platform` running before `machine_set_current_thread`; the patch is safe because
+every `_current_percpu_base` caller adds the result to a global per-CPU base, so 0 selects the boot CPU.
+
+**2026-10-28 ~21:45: past the percpu fault; now the post-MMU payload poison loop (BUILD-2010-MFB).** Flashed
+the 0e8e9b7f v4. The early console is visible again and panics at `pc 0xfffffe000751a038`
+(`el1_sp0_synchronous_vector_long+0x38`), `far=0x150`, `esr=0x96000006`, `cpsr=0x624003c5` (SP0). This is a
+*secondary* fault that masks the original one: the sp0 vector does `mrs x1,TPIDR_EL1; add x3,x1,#0x150;
+ldr x2,[x3]`, so with TPIDR_EL1=0 it reads `[0x150]` and dies; the sp1 vector is NULL-safe (`cbz x18`), sp0
+is not. The original ELR/ESR/FAR are overwritten. The surviving registers (x4..x30 are untouched by the
+vector) are the state left by `common_start` just before it returns into `_arm_init`: `x19=x30=_arm_init`
+(0x7bca23c), `x20=boot_args` 0xb26c4000, `x22=0xfffffe0007004000`, `x23=0xb1004000`, `x8=0xa8526700`,
+`x10=0xd2f0`, `x28=0xa80b1000`, `sp=0x825ffe0` (the initial SP0, so `_arm_init`'s prologue never ran).
+`x8=0xa8526700` + `x10=0xd2f0` is exactly the second poison loop at 0x751e4ac (`str w9,[x8],#4`, 0xd2f0
+iterations). `__start` (0x751e488) poisons PA 0xa84f1b00..0xa85266c0 *before* the kernel page tables exist
+(loader identity map), then `common_start` branches to 0x751e4ac, a second loop poisoning
+0xa8526700..0xa855d2c0 *after* SCTLR_EL1 enables the kernel MMU. The kernel MMU only maps the kernel
+segments (PA >= PHYS_BASE 0xb0000000); the old payload at 0xa8... is gone, so the first store is a data
+abort. Payload header (image 0xd2000): `virt_base=0xfffffe0006000000 PHYS_BASE=0xb0000000
+kernel_end=0xfffffe00086c0000`. Fix in `patch-marble-fb.py`: (1) `common_start` 0x7520418 (file 0x51c418)
+`b 0x751e4ac` -> `b 0x751e4c8`, skipping the poison but keeping `add x0,x20,x22; sub x0,x0,x23; ret`;
+(2) make the sp0 vector NULL-safe like sp1: 0x751a034 (file 0x516034) `add x3,x1,#0x150` -> `b 0x751a06c`
+(the normal frame builder), so any remaining fault prints the real frame instead of being masked. Kept the
+percpu patch. Also explained the 8-byte shift seen when diffing the image against the .marble: the payload
+stores each segment at its own `off` (mkpayload pads each to 16 bytes) and `__TEXT` ends 8 mod 16, so
+`__DATA_CONST` and everything after is +8 in the file; the loader copies by the payload segment table, so
+the runtime layout is exact and the patches land at the right VAs (verified: patched bytes at the expected
+image offsets). Rebuilt v4+v2 (v4 sha256 `712267d6…`, v2 `c1e0e7e4…`) and deployed to all three folders.
+Next: flash `enxerto-boot-marble-boot.img`; if it still panics the sp0 vector will now print the true
+pc/esr/far.
+
+**2026-10-28 ~22:00: boot reaches kprintf startup, dies on the physical timer (BUILD-2010-MFB).** Flashed the
+712267d6 v4: the kernel now runs all 20 early stages (`arm_init`, `PE_init_platform`, `cpu_bootstrap`,
+`ml_parse_cpu_topology`, `kernel_bootstrap`, `kernel_startup`, `kernel_memory_config`, `early_mapping`, TLB,
+`arm_vm_init`, `pcpu_init`, `pmap_bootstrap`, `pexpert_init`, `early_printk_init`, `x86_hvm_init`,
+`sercl_init`, `config_init`, `config_init_retry`, `kprintf startup complete`) and then panics
+`SWEET EARLY PANIC: Undefined kernel instruction: pc=0xfffffe0007524790 instr=d51be228 @sleh.c:1197`.
+`0x7524790` is inside `_fiq_context_init` (0x7524774): it does `msr CNTV_CTL_EL0,#1` (works) then
+`mov w8,#2; msr CNTP_CTL_EL0,x8` and *that* store is the undefined instruction. So marble's non-secure
+EL1 cannot touch the physical timer (`CNTP_*` is owned by the secure/hyp world; `CNTHCTL_EL2.EL1PCEN=0`
+and there is no EL2 to trap/emulate it), while the virtual timer `CNTV_*` is fine. There is exactly **one**
+`CNTP` access in the whole kernel (this one); everything else uses `CNTV`. Fix: `patch-marble-fb.py` nops
+file 0x520790 (`msr CNTP_CTL_EL0,x8` -> `nop`), keeping the CNTV enable. The tick uses the virtual timer,
+so disabling the physical timer is unnecessary. Rebuilt v4+v2 (v4 sha256 `d65eaf87…`, v2 `92d02ce9…`) and
+deployed to all three folders. Next: flash `enxerto-boot-marble-boot.img`; expect it to continue past
+`_fiq_context_init` into the rest of `arm_init` (interrupts, scheduler, thread bootstrap).
+
+**2026-10-28 ~23:00: "Invalid kernel stack pointer" is a skmem fault, not the stack check (BUILD-2010-MFB).**
+The newest photo's panic is a kernel data abort (EC 0x26), not the sp0 SP_EL0 validation. The el1_sp0 vector
+routes EC 0x26 unconditionally to `fleh_invalid_stack` (0x751a01c -> 0x751a06c -> 0x751a0a0 -> 0x751a0ac),
+which calls `_sleh_invalid_stack` and panics. The actual fault is `_skmem_sysctl_init` (0x7721020): it calls
+`_skmem_get_sysctls_obj(0)`, which returns global 0x7d14f28; `_skmem_init` (0x799b978) sets that global from
+`_skmem_region_alloc`, which returns a segment pointer `0xfffffe78bf4b4000` - below the kalloc heap base, so
+unmapped. `str w8,[x0]` at 0x7721038 faults (esr 0x96000047, write, translation fault level 3). The earlier
+0x516034 (VA 0x751a034) patch was misguided: it routes EC 0x25 straight into the panic path and never touched
+EC 0x26, so it did not fix this; it is left in place for now but should be replaced with a real NULL-safe
+check. Fix (test): `patch-marble-fb.py` file 0x997a40 (`bl _skmem_region_alloc` -> `b 0x799ba60`) skips the
+segment alloc + sysctl init, leaving the segment NULL (the sysctl init's `cbz x0` handles it). Rebuilt v5
+sha256 `0a06c62172b1ebfceef4e5e92284c3a5a65892a3786abb5449d19556aa111248`, deployed to all three folders as
+`enxerto-boot-marble-boot-v5.img`. Next: flash v5; if it gets past skmem, watch for a NULL segment use later
+(socket/network paths) or the next new panic.
+
+**2026-10-29 ~04:10: skmem fixed; real blocker is the UFS root (error 5), trace hidden by kprintf spam
+(BUILD-2010-MFB).** v5 flashed: the skmem data abort is gone. The kernel now reaches `AppleCLCD::start`
+and `IOFindBSDRoot`; the screen shows `SWEET EARLY PANIC: IOFindBSDRoot: SWEET UFS root ufsroot0
+unavailable: 5 @IOKitBSDInit.cpp:808`, i.e. `sweet_ufs_rootdev` returned EIO(5). The panic is xref'd only
+from `IOFindBSDRoot+0xd70` (VA 0x7b1e27c); the single caller is `IOFindBSDRoot+0x5f4` (`bl 0x757cfac` at
+VA 0x7b1db00) which panics on non-zero return. The panic thread then sits in the KDP wait (`debug=0xc
+serial=3`), so on `cpus=1` the scheduler keeps running the other threads: the bootlog header ticks and the
+FB stats advance to `up_s=1118`/`win_ms=1830`, `swaps=0 hw=0 flip=0` (no GUI frame -> `sweet_bootlog_stop`
+in `AppleCLCD::present/swapFired/quietConsole` never fires). The `SWEET UFS:` trace prints (proven byte-
+identical in v5's payload at off 0x57939c vs `.marble` 0x578fac) never appear on screen because
+`-enable_kprintf_spam` writes >4 MiB into the 4 MiB `sweet_log_ring` (BSS, zeroed each boot per
+loader.c:305-306) over the ~1118 s the panic waits, wrapping the ring and overwriting the early trace;
+`sweet_early_panic` only survives because it paints the FB directly. Fix (diagnostic): drop
+`-enable_kprintf_spam` from the `mkboot-full.sh` CMDLINE so the ring stops wrapping and the trace stays in
+the last ~69 bootlog rows for ~10 min. Rebuilt v6 sha256
+`4165943dcaa41525b36425330387e12a227bf6a1bc9f51252987a63247af98d9`, deployed to all three folders as
+`enxerto-boot-marble-boot-v6.img`. Next: flash v6 and photograph within ~10 min; read the `SWEET UFS:
+durability / init, regs / hce / DMA / host taken over / TUR %d` lines to see whether it fails at takeover
+("host did not take our request list") or in the TUR/GPT SCSI path, then fix that specific step.
+
+**2026-10-29 ~04:35: v6 flashed; trace still hidden — the bootlog only renders the last rows (BUILD-2010-MFB).**
+v6 photo (`SHA_20261029_041729991`): header `74.419 s`, panic still `IOFindBSDRoot: SWEET UFS root
+ufsroot0 unavailable: 5 @IOKitBSDInit.cpp:808`, and **no `SWEET UFS:` line anywhere**. The ring no longer
+wraps (74 s), so the cause is the bootlog renderer itself: `bl_pos=0` drains the whole ring, but
+`bl_newline` scrolls once `bl_cur` reaches `bl_rows-1`, so only the LAST `bl_rows` (~69 at scale 2) lines
+are drawn and the early UFS trace has scrolled off (Boot B, after the panic, adds ~30 more lines). The
+panic is real and current: the driver reaches its trace (the DT-error path returns ENXIO 6, not 5), the
+takeover readback at 0x757d49c returns EIO 5, and `ufs_scsi_at` also returns EIO 5 at 0x757e510 when a SCSI
+command's response UPIU is not a clean success (`w24!=0`, type!=0x21, status!=0, or flags==0) — so it is the
+TUR or GPT READ(10) failing at the transport level. Boot B is stuck after `AppleCLCD` at the FB stats
+(`up_s=45/55/66`), never reaching root mount. Fix (diagnostic): set `sweetbootlog_scale=1` (139 rows) and
+patch the two inlined `bl_newline` copies in `_bl_tick` to stop scrolling and cap at the last row
+(`patch-marble-fb.py` file 0x4eab84 `b.ge` -> 0x74eec60 and 0x4eabd4 `b` -> 0x74eec60), so the first ~138
+lines (including the early `SWEET UFS:` trace) stay on screen. Rebuilt v7 sha256
+`af8fb6db55f94cfb74c6f9a307931f9986cd29602c2a21d10b126969e0bae877`, deployed to all three folders as
+`enxerto-boot-marble-boot-v7.img` (payload verified: bootlog bytes at payload 0x4eaf74/0x4eafc4). Next:
+flash v7, photograph; read `SWEET UFS: hce/hcs/cap/ver/is/utrlba/dbr/rsr` + `TUR %d` to pick the exact
+takeover-vs-TUR fix.
+
+
+**2026-10-29 ~04:50: v7 flashed — no-scroll works, trace still absent; root-caused the EIO(5) readback and built v8.**
+v7 photos (`SHA_20261029_044408761`, `SHA_20261029_044447868`): the no-scroll + `sweetbootlog_scale=1` patch
+works (first ~138 lines stay, starting at `Darwin Kernel Version`), but **still no `SWEET UFS:` line**. The
+panic is painted right after `zone_init: map GEN2`, i.e. at the early console's *stale* cursor (the early
+console has its own buffer 0x7d52e34, only updated by `sweet_early_mark`/`sweet_early_panic`); the bootlog
+ring (0x7d542f8, fed by serial `_cnputs`) is a separate stream. Boot order confirmed: `kernel_bootstrap_thread`
+(0x7b9fc18) runs `PE_lockdown_iokit`/`vm_set_restrictions`/`kperf_init_early` then `bsd_init` (0x784122c) at
+0x7ba00d4, and `bsd_init` calls `IOFindBSDRoot` at 0x7841804 -> `sweet_ufs_rootdev` -> panic. The panic is
+fatal (`_panic_trap_to_debugger` 0x737acbc calls `sweet_early_panic` then `ml_panic_trap_to_debugger`), so the
+boot is a panic->reboot loop: v7b is the next boot, reaching platform expert/MAC framework/CPU and the
+`AppleCLCD` FB stats (`up_s=103/113/123`) before it reaches bsd_init again. The UFS trace is in the ring but
+the panic halts before the next 30 Hz `_bl_tick` drains it, so it stays invisible.
+Flow re-derived: host-ready gate at 0x757d3a8 (HCE bit0, HCS bits 0/1, UTRLDBR==0, else ENXIO 6 / EBUSY 16)
+passes; takeover 0x757d440 writes IE=0, clears IS, UTRLRSR=0, UTRLBA/UTRLBAU=dma_pa, UTRLRSR=1; then the
+readback at 0x757d478-0x757d498 compares UTRLBA/UTRLBAU and UTRLRSR bit0 **immediately** after setting run —
+a start-latency race (and possibly write-only regs) makes it mismatch and return EIO(5) at 0x757d4a8. Fix
+(hypothesis): bypass the readback and let the TUR (0x757d4bc, which has its own polling/retry) decide —
+`patch-marble-fb.py` file 0x579478 `ldr x9,[x20]` (0xf9400289) -> `b 0x757d4b0` (0x1400000e). Rebuilt v8
+sha256 `d9dff6d92c9d5f7bfe53ec73554bf3525592ec5abdce3a44d501ac0b4ca3aea0`, deployed to all three folders as
+`enxerto-boot-marble-boot-v8.img` (image verified: UFS 0x64b868=0e000014, bootlog 0x5bcf74/0x5bcfc4). Next:
+flash v8, photograph; if the panic changes from EIO 5 the readback was the cause; if it stays 5 the TUR/GPT
+READ(10) is next (check `SWEET UFS:` hce/hcs/cap/ver/is/utrlba/dbr/rsr).
+
+
+**2026-10-29 ~07:56: v8 flashed — still EIO(5), readback ruled out; battery root cause found (beryllium SPMI
+addresses) and built v9 with the SPMI remap + UFS error surfacing.**
+v8 photos (`SHA_20261029_060028572`, `SHA_20261029_060050702`): the readback bypass did not help — still
+`IOFindBSDRoot: SWEET UFS root ufsroot0 unavailable: 5 @IOKitBSDInit.cpp:808`, Boot B still hangs at the
+`AppleCLCD` FB stats. So the takeover readback was not the cause; the EIO comes from `ufs_scsi_at`
+(TUR/GPT READ(10)) at 0x757e510. UTRD/OCS verified correct against upstream `ufshci.h`: the OCS is DW2
+(0x08) `request_desc_header.ocs`, DD read=2/write=1 in DW0 bits [26:25], response length/offset at DW6
+(0x18) = 128/128 DWORDs, PRDT at DW7 (0x1c) = offset 256/length n — all match. The failure is
+`ocs != 0 || resp[0] != 0x21 || resp[6] != 0` (resp[0] is bzeroed to 0 if the host never writes it).
+**Battery root cause (certain):** `bsd/dev/sweet_spmi.c` (patch 0062) hardcodes *beryllium* SPMI bases;
+marble's `spmi0` (`dtb/marble/marble.dts:8722`, reg-names cnfg/core/chnls/obsrvr/intr =
+0xc42d000/0xc400000/0xc500000/0xc440000/0xc4c0000) differ. The driver maps SP_CORE_PA=0xc440000 (which is
+marble's *obsrvr*), so `arb_version = sp_rd(sp_core,0)` reads garbage 0x1f and `sp_count` reads 0 ->
+`SWEET BATTERY: unsupported SPMI arb=0x0000001f APIDs=0` -> static 100%/4200mV fallback. v9 patches the
+three constants in `_sweet_spmi_init` (0x75865ac): SP_CORE_PA 0xc440000->0xc400000 (file 0x58261c
+`8088a152`->`0088a152`), SP_CFG_PA 0xc40a000->0xc42d000 (0x582630 `00009452`->`00009a52` mov low 0xa000->
+0xd000, 0x582634 `0088a172`->`4088a172` movk 0xc40->0xc42), SP_OBS_PA 0xe600000->0xc440000 (0x582648
+`00cca152`->`8088a152`). Also patch the UFS failure `printf` (0x757e4e4 `3b93f897` bl _printf ->
+`43571894` bl _panic) so the next flash draws `SWEET UFS: command 0x%02x failed: ocs/upiu/response/status`
+on screen instead of dying invisibly in the bootlog ring. Rebuilt v9 sha256
+`bdfce02afa89c72eb766f699290d8589fc77f19aba8b6f658480df12b843215b`, deployed to all three folders as
+`enxerto-boot-marble-boot-v9.img` (image verified: 0x654a0c/0x654a20/0x654a24/0x654a38/0x64c8d4, plus v8
+0x64b868). Next: flash v9, photograph; battery should read real values (no `unsupported SPMI`), and the UFS
+panic should now print the ocs/upiu/response/status triple that pinpoints the transport fix.
+
+
+**2026-10-29 ~08:40: v9 photos analyzed — UFS root cause confirmed (Device W-LUN 0xd0 power initialization required), built v10.**
+Photos from user (, , ):
+1. : MMIO remap of SPMI to marble base 0xc400000/0xc42d000/0xc440000 succeeded and read real hardware (v7, 768 APIDs). The driver rejects arbiter versions >= 0x70000000 and APIDs > 512, safely falling back to static 100% 4200mV (non-fatal, does not block boot).
+2. :
+   -  is SCSI  (TUR).
+   - Target responds with  (UFS HCI transport clean success),  (CHECK CONDITION),  (NOT READY),  /  (LOGICAL UNIT NOT READY, INITIALIZING COMMAND REQUIRED).
+   - Exactly identical to UniXNU marble discovery (): on Marble (Qualcomm SM7475 UFS 3.1), LUN 0 requires the Device Well-Known LUN () to receive SCSI opcode  (, CDB , Power Condition 0x1 Active) before LUN 0 can transition to ready.
+   - Also, v9 patch had replaced failure  at 0x757e4e4 with , causing panic on first TUR attempt.
+**Fix in v10 ():**
+1. Reverted 0x757e4e4 back to  ().
+2. Replaced the 3 failing TUR attempts at 0x757d4bc (file offset 0x5794bc) with:
+   - Set  (Device W-LUN).
+   - Execute SCSI  (CDB ) via .
+   - Delay 10ms ().
+   - Set .
+   - Execute TUR on LUN 0 via .
+   - On success (), jump to 0x757d534 ( -> GPT partition probe).
+Rebuilt v10 sha256 v4 , v2 .
+Deployed to , ,  as  and  (also saved with ).

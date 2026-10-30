@@ -1,12 +1,13 @@
 <p align="center">
-  <img src="apps/Bergamota/Bergamota/Assets.xcassets/AppIcon.appiconset/icon_256x256@2x.png" width="168" alt="Bergamota">
+  <img src="enxerto/applelogo.png" width="168" alt="Project Apple">
 </p>
 
-<h1 align="center">Bergamota Project</h1>
+<h1 align="center">Project Apple</h1>
 
 <p align="center">
-  <b>Apple's iOS 18 on a Poco F5</b><br>
-  Xiaomi <code>marble</code> · Qualcomm Snapdragon 7+ Gen 2 (SM7475) · iOS 18.7.8 (22H352)
+  <b>Apple's iOS 18 on a Poco F5 (Redmi Note 12 Turbo)</b><br>
+  Xiaomi <code>marble</code> · Qualcomm Snapdragon 7+ Gen 2 (SM7475) · iOS 18.7.8 (22H352)<br>
+  <i>Featuring pure-black authentic Apple logo boot sequence and full hardware adaptation</i>
 </p>
 
 <p align="center">
@@ -240,6 +241,11 @@ It can do this for Mach-O binaries and the dyld shared cache. It re-signs each b
 
 Not in git: partition backups, device trees, Apple firmware and root images, or anything with serial numbers or calibration data.
 
-## Credits
+## Credits & Acknowledgments
 
-This started as a fork of [ios-sweet](https://github.com/dipa-studio/ios-sweet) (iOS 16 on the Redmi Note 10 Pro). The iOS 16 days of this port are in [`docs/IOS16_README.md`](docs/IOS16_README.md). It is built on Apple's open-source releases (xnu, IOHIDFamily, libpthread, hfs), [BearSSL](https://bearssl.org), [blacktop/darwin-xnu-build](https://github.com/blacktop/darwin-xnu-build) and [ipsw](https://github.com/blacktop/ipsw), the Linux kernel's SDM845 drivers for the hardware details, and [OrangeFox Recovery](https://orangefox.download). iOS itself is Apple's and is not distributed here.
+This project (**Project Apple**) is built upon and honors the foundational work of:
+* **[Bergamota Project](https://github.com/ry-diffusion/Bergamota)**: For the groundbreaking iOS 18 port on SM7475 / Poco F5, Enxerto bootloader infrastructure, Renegade patcher, and the complete hardware bring-up architecture.
+* **[ios-sweet](https://github.com/dipa-studio/ios-sweet)**: The pioneer project for running iOS 16 on Redmi Note 10 Pro (`sweet`) and Poco F1 (`beryllium`).
+* **[UniXNU](https://github.com/UniXNU)**: Reference implementation and insights on XNU Darwin bring-up.
+* **Apple Inc.**: Open-source Darwin releases (XNU, IOHIDFamily, libpthread, xnu-11215).
+* **Open Source Tools**: BearSSL, blacktop/ipsw, OrangeFox Recovery, and Qualcomm Linux mainline contributors.

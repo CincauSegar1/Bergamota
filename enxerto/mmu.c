@@ -64,7 +64,7 @@ static void dcache_inval_range(uintptr_t start, uintptr_t end)
 
 	for (uintptr_t a = start & ~(line - 1); a < end; a += line)
 		__asm__ volatile("dc ivac, %0" : : "r"(a) : "memory");
-	__asm__ volatile("dsb sy" ::: "memory");
+	__asm__ volatile("dsb nsh" ::: "memory");
 }
 
 static void zero_table(uint64_t *t)
@@ -110,6 +110,10 @@ int mmu_enable_ranges(struct mmu_info *info, const struct mmu_range *extra, int 
 	for (uint64_t i = 0; i < (8UL << 30) >> BLK_SHIFT; i++)
 		l2[i] = (i << BLK_SHIFT) | DEV_FLAGS | D_BLOCK;
 	l2[FB_PHYS >> BLK_SHIFT] = (FB_PHYS & ~(BLK_SIZE - 1)) | NC_FLAGS | D_BLOCK;
+	extern volatile uint32_t *con_fb;
+	uintptr_t cfb = (uintptr_t)con_fb;
+	if (cfb && cfb < (8UL << 30))
+		l2[cfb >> BLK_SHIFT] = (cfb & ~(BLK_SIZE - 1)) | NC_FLAGS | D_BLOCK;
 
 	/* Write-back: whole blocks inside a range, an L3 table for blocks it only partly covers */
 	for (int r = 0; r < n; r++) {
@@ -136,7 +140,7 @@ int mmu_enable_ranges(struct mmu_info *info, const struct mmu_range *extra, int 
 	/* Lines may be stale in the cache from ABL; we wrote memory directly. */
 	for (int r = 0; r < n; r++)
 		dcache_inval_range(wb[r].lo, wb[r].hi);
-	__asm__ volatile("ic iallu; dsb sy; isb" ::: "memory");
+	__asm__ volatile("ic iallu; dsb nsh; isb" ::: "memory");
 
 	wsr("mair_el1", MAIR_VAL);
 	wsr("tcr_el1", TCR_VAL);

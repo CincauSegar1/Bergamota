@@ -60,11 +60,15 @@ void con_set_bg(uint32_t bg)
 
 void con_clear(uint32_t bg)
 {
-	for (int y = 0; y < FB_H; y++) {
-		volatile uint32_t *line = con_fb + y * (FB_STRIDE / 4);
-		for (int x = 0; x < FB_W; x++)
-			line[x] = bg;
-	}
+	volatile uint64_t *fb64 = (volatile uint64_t *)con_fb;
+	uint64_t val64 = ((uint64_t)bg << 32) | (uint64_t)bg;
+	uint64_t nwords = ((uint64_t)FB_STRIDE * FB_H) / 8;
+#if defined(BOARD_MARBLE)
+	if (nwords < 0x01800000 / 8)
+		nwords = 0x01800000 / 8;
+#endif
+	for (uint64_t i = 0; i < nwords; i++)
+		fb64[i] = val64;
 	con_bg = bg;
 	row = TOP_ROWS;
 	base_y = MARGIN;

@@ -85,6 +85,13 @@ static void status(uint32_t fg, const char *s)
 
 void bootui_init(void)
 {
+#ifdef HAVE_APPLELOGO
+	con_clear(0xff000000U);
+	bootui_draw_rle(applelogo_pal, applelogo_rle, APPLELOGO_W, APPLELOGO_H,
+			(FB_W - APPLELOGO_W) / 2, (FB_H - APPLELOGO_H) / 2);
+	active = 1;
+	return;
+#endif
 	enum art_image num = art_ios_numerals();
 	bootui_scene(PORTRAIT_X, PORTRAIT_W, (FB_W - art_image_w(num)) / 2, 150, num);
 	art_text_centered(ART_MONO30, SUB_Y, ID_INK, num == ART_NUM_18 ? "iOS 18 / " DEVICE_NAME : "iOS 26 / " DEVICE_NAME);
@@ -104,11 +111,10 @@ void bootui_handoff(void)
 #ifdef HAVE_APPLELOGO
 	/* iBoot-style: black, Apple logo centred, nothing else. Stays on the panel (xnu keeps the boot
 	 * framebuffer untouched in graphics mode) until backboardd presents its own identical logo. */
-	if (!active)
-		return;
 	con_clear(0xff000000U);
 	bootui_draw_rle(applelogo_pal, applelogo_rle, APPLELOGO_W, APPLELOGO_H,
 			(FB_W - APPLELOGO_W) / 2, (FB_H - APPLELOGO_H) / 2);
+	active = 0;
 #endif
 }
 
@@ -125,6 +131,9 @@ static void bar_to(unsigned permille)
 
 void bootui_progress(unsigned permille, const char *s)
 {
+#ifdef HAVE_APPLELOGO
+	return;
+#endif
 	bar_to(permille);
 	status(ID_INK, s);
 }
@@ -143,6 +152,9 @@ static char *put_u(char *d, uint64_t v)
 
 void bootui_mib(const char *label, uint64_t done, uint64_t total, unsigned from, unsigned to)
 {
+#ifdef HAVE_APPLELOGO
+	return;
+#endif
 	char buf[64], *d = buf;
 	while (*label && d < buf + 24)
 		*d++ = *label++;

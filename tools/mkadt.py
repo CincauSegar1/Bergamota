@@ -72,13 +72,16 @@ BOARDS = {
         bluetooth=True),
     'marble': dict(
         # Poco F5 (SM7475 / Snapdragon 7+ Gen 2): 1080x2400 AMOLED (120Hz)
-        fb=(0xa8000000, 0x1700000), fb_wh=(1080, 2400),
+        # ABL moves the splash here because the v4 boot image loads at 0xa8000000.
+        fb=(0xb8000000, 0x1700000), fb_wh=(1080, 2400),
         compat=['xiaomi,marble', 'xiaomi,sweet', 'qcom,sm7475', 'qcom,diwali'],
         # 0-3 Cortex-A510, 4-6 Cortex-A710, 7 Cortex-X2
         cpu_compat='qcom,kryo', big_from=4, freqs=(1800000000, 2490000000),
-        # Safe clean DRAM bank from 0xb0000000 to 0xe0000000 (768MB); 0xe0600000+ is TrustZone/QTEE
-        mem=(0xb0000000, 0x30000000),
+        # Safe clean DRAM bank from 0xba000000 to 0xe0000000 (608MB); starts above splash fb (0xb8000000..0xb9700000)
+        mem=(0xba000000, 0x26000000),
         gicd=0x17100000, gicr=0x17180000, gicr_size=0x200000,
+        vtimer_intid=27,
+        redistributor_stride=0x40000,
         chosen_extra=[
             ('mac-address-wifi0', bytes([0x02, 0x00, 0x5e, 0x77, 0xe0, 0x02])),
             ('mac-address-bluetooth0', bytes([0x02, 0x00, 0x5e, 0x77, 0xb0, 0x02])),
@@ -100,14 +103,25 @@ D22AP_ADT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../researc
 def d22ap_product(path=D22AP_ADT):
     """/product properties of the real D22AP tree, without the syscfg
     placeholders iBoot would fill in (flag bit set) and the node bookkeeping."""
-    if not os.path.exists(path):
-        print(f'warning: {path} missing, no /product node', file=sys.stderr)
-        return None
-    root, _ = adt.parse(open(path, 'rb').read())
-    for c in root.children:
-        if dict((k, v) for k, f, v in c.props).get('name') == b'product\0':
-            return [(k, v) for k, f, v in c.props if not f and k not in ('name', 'AAPL,phandle')]
-    raise SystemExit(f'{path}: no /product node')
+    if os.path.exists(path):
+        root, _ = adt.parse(open(path, 'rb').read())
+        for c in root.children:
+            if dict((k, v) for k, f, v in c.props).get('name') == b'product\0':
+                return [(k, v) for k, f, v in c.props if not f and k not in ('name', 'AAPL,phandle')]
+    # Fallback standard D22AP (iPhone X) product properties for MobileGestalt/SpringBoard
+    return [
+        ('artwork-device-idiom', cstr('phone')),
+        ('artwork-scale-factor', u32(3)),
+        ('artwork-device-subtype', u32(2436)),
+        ('artwork-display-gamut', cstr('sRGB')),
+        ('product-name', cstr('iPhone')),
+        ('product-description', cstr('iPhone X')),
+        ('product-type', cstr('iPhone10,3')),
+        ('model', cstr('D22AP')),
+        ('target-type', cstr('D22')),
+        ('device-class', cstr('iPhone')),
+        ('standard-device-class', cstr('iPhone')),
+    ]
 
 u32 = lambda *v: struct.pack('<%dI' % len(v), *v)
 u64 = lambda *v: struct.pack('<%dQ' % len(v), *v)
@@ -252,13 +266,17 @@ def build(seed=None, qemu=False, highmem=False, board='sweet', display_scale=3, 
     cpus = node('cpus', [ph(), ('#address-cells', u32(1)),
                          ('#size-cells', u32(0))], cpu_nodes)
 
-    gic = node('gic', [
+    vtimer = QEMU_VTIMER_INTID if qemu else b.get('vtimer_intid', VTIMER_INTID)
+    gic_props = [
         ph(),
         ('compatible', cstr('arm,gic-v3')),
         ('interrupt-controller', b''),
-        ('virtual-timer-intid', u32(QEMU_VTIMER_INTID if qemu else VTIMER_INTID)),
+        ('virtual-timer-intid', u32(vtimer)),
         ('reg', u64(gicd - SOC_BASE, GICD_SIZE, gicr - SOC_BASE, gicr_size)),
-    ])
+    ]
+    if 'redistributor_stride' in b:
+        gic_props.append(('redistributor-stride', u32(b['redistributor_stride'])))
+    gic = node('gic', gic_props)
     arm_io = node('arm-io', [
         ph(),
         ('device_type', cstr('sweet-io')),
@@ -344,13 +362,31 @@ def build(seed=None, qemu=False, highmem=False, board='sweet', display_scale=3, 
 
 
 if __name__ == '__main__':
+    if '--dump' in sys.argv and '--board' not in sys.argv and len(sys.argv) == 3:
+        target = sys.argv[1] if sys.argv[2] == '--dump' else sys.argv[2]
+        if os.path.exists(target):
+            adt.dump(adt.parse(open(target, 'rb').read())[0])
+            sys.exit(0)
     board = sys.argv[sys.argv.index('--board') + 1] if '--board' in sys.argv else 'sweet'
     scale = int(sys.argv[sys.argv.index('--display-scale') + 1]) if '--display-scale' in sys.argv else 3
     points = tuple(int(v) for v in sys.argv[sys.argv.index('--points') + 1].split('x')) if '--points' in sys.argv else (375, 812)
     lowpool = parse_lowpool(sys.argv[sys.argv.index('--lowpool') + 1]) if '--lowpool' in sys.argv else None
+    out_file = None
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg in ('--board', '--display-scale', '--points', '--lowpool'):
+            i += 2
+        elif arg.startswith('--'):
+            i += 1
+        else:
+            out_file = arg
+            i += 1
+    if not out_file:
+        out_file = 'out.adt'
     root = build(qemu='--qemu' in sys.argv, highmem='--highmem' in sys.argv, board=board, display_scale=scale, points=points, lowpool=lowpool)
     blob = adt.serialize(root)
-    open(sys.argv[1], 'wb').write(blob)
+    open(out_file, 'wb').write(blob)
     if '--dump' in sys.argv:
         adt.dump(adt.parse(blob)[0])
-    print(f'{sys.argv[1]}: {len(blob)} bytes', file=sys.stderr)
+    print(f'{out_file}: {len(blob)} bytes', file=sys.stderr)

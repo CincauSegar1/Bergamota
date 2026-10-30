@@ -15,13 +15,13 @@
 		ranges;
 		stdout-path = "/soc/qcom,qup_uart@994000:115200n8";
 		bootargs = "console=null bergamota.fastboot=1 cont_splash=1";
-		framebuffer-base = <0x00 0xa8000000>;
-		qcom,cont-splash-mem = <0x00 0xa8000000 0x00 0x01800000>;
+		framebuffer-base = <0x00 0xb8000000>;
+		qcom,cont-splash-mem = <0x00 0xb8000000 0x00 0x01800000>;
 		phandle = <0x21f>;
 
-		framebuffer0: framebuffer@a8000000 {
+		framebuffer0: framebuffer@b8000000 {
 			compatible = "simple-framebuffer";
-			reg = <0x00 0xa8000000 0x00 0x01000000>;
+			reg = <0x00 0xb8000000 0x00 0x01800000>;
 			width = <1080>;
 			height = <2400>;
 			stride = <4320>;
@@ -44,9 +44,9 @@
 		ranges;
 		phandle = <0x220>;
 
-		cont_splash_mem: cont_splash_region@a8000000 {
+		cont_splash_mem: cont_splash_region@b8000000 {
 			no-map;
-			reg = <0x00 0xa8000000 0x00 0x01800000>;
+			reg = <0x00 0xb8000000 0x00 0x01800000>;
 		};
 
 		hyp_mem: hyp_region@80000000 {

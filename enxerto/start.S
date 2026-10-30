@@ -157,25 +157,32 @@ mmu_off_jump:
 	mov	x16, x0			/* entry */
 	mov	x17, x1			/* arg */
 	ldp	x3, x4, [x2, #0]
+
 	mrs	x9, ctr_el0		/* DminLine: log2 words */
 	ubfx	x9, x9, #16, #4
 	mov	x13, #4
 	lsl	x13, x13, x9		/* line bytes */
 	sub	x14, x13, #1
+	ldp	x5, x6, [x2, #16]	/* second range: payload */
+	ldp	x7, x8, [x2, #32]	/* third range: our image (stack!) */
 	dsb	nsh
 	cvac_range x3, x4
+	cvac_range x5, x6
+	cvac_range x7, x8
 	dsb	nsh
+
 	mrs	x9, sctlr_el1
-	mov	x10, #((1 << 0) | (1 << 2))	/* M, C */
-	orr	x10, x10, #(1 << 12)		/* I */
+	mov	x10, #((1 << 0) | (1 << 2))	/* M, C (leave I cache ON!) */
 	bic	x9, x9, x10
 	msr	sctlr_el1, x9
 	isb
 	dsb	nsh
+
 	tlbi	vmalle1
 	ic	iallu
 	dsb	nsh
 	isb
+
 	mov	x0, x17
 	br	x16
 
@@ -198,11 +205,11 @@ mmu_off_ret:
 	mov	x13, #4
 	lsl	x13, x13, x9		/* line bytes */
 	sub	x14, x13, #1
-	dsb	sy
+	dsb	nsh
 	civac_range x3, x4
 	civac_range x5, x6
 	civac_range x7, x8
-	dsb	sy
+	dsb	nsh
 	mrs	x9, sctlr_el1
 	mov	x10, #((1 << 0) | (1 << 2))	/* M, C */
 	bic	x9, x9, x10
@@ -211,8 +218,8 @@ mmu_off_ret:
 	civac_range x3, x4
 	civac_range x5, x6
 	civac_range x7, x8
-	dsb	sy
+	dsb	nsh
 	tlbi	vmalle1
-	dsb	sy
+	dsb	nsh
 	isb
 	ret

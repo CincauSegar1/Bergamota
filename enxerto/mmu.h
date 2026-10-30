@@ -27,7 +27,8 @@ int mmu_enable_ranges(struct mmu_info *info, const struct mmu_range *r, int n);
  * the I-cache, then branch to entry with x0 = arg. Uses no memory after the
  * first clean. Also fine to call with the MMU already off. start.S.
  */
-void __attribute__((noreturn)) mmu_off_jump(uint64_t entry, uint64_t arg, const struct mmu_range r[3]);
+void __attribute__((noreturn)) mmu_off_jump(uint64_t entry, uint64_t arg, const struct mmu_range r[3],
+					   uintptr_t fb);
 /*
  * Leave the MMU/D-cache and RETURN to the caller (the counterpart of mmu_enable_ranges for a temporary
  * cached window): same cleaning as mmu_off_jump over the three ranges (pass the image, and the extra

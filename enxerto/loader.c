@@ -255,7 +255,8 @@ const char *loader_boot_payload(uintptr_t rd_start, uintptr_t rd_end, int verify
 	con_hex2("PHYS", "base=", p->phys_base, "size=", p->mem_size);
 	con_hex("VIRT", p->virt_base);
 	con_hex("ENTRY", p->entry_va);
-	bootui_progress(PM_PAYLOAD, "PAYLOAD OK");
+	con_hex("FB", (uintptr_t)con_fb);
+	bootui_progress(PM_PAYLOAD, "PAYLOAD OK 2010-MFB");
 
 	/* The payload must not overlap where the kernel goes. */
 	if (rd_end > p->phys_base && rd_start < p->phys_base + p->mem_size)
@@ -323,7 +324,7 @@ const char *loader_boot_payload(uintptr_t rd_start, uintptr_t rd_end, int verify
 	ba->physBase = p->phys_base;
 	ba->memSize = p->mem_size;
 	ba->topOfKernelData = top;
-	ba->Video.v_baseAddr = FB_BASE;
+	ba->Video.v_baseAddr = (uintptr_t)con_fb;
 	ba->Video.v_display = 1;
 	ba->Video.v_rowBytes = FB_STRIDE;
 	ba->Video.v_width = FB_W;
@@ -341,7 +342,7 @@ const char *loader_boot_payload(uintptr_t rd_start, uintptr_t rd_end, int verify
 	con_hex("JUMP", entry_pa);
 	bootui_progress(1000, "STARTING IOS");
 	enxerto_charger_handoff();	/* the kernel's sweetcharger=2 finds the charger registers as ABL left them */
-	con_str("XNU", "JUMPING BUILD-1500-CLEAN");
+	con_str("XNU", "JUMPING BUILD-V39-HIGHMEM-4GB-FASTBOOT");
 	bootui_handoff();
 
 	/* Clean to memory, MMU and caches off, invalidate, jump (also right when mmu_rc failed). */
@@ -355,5 +356,5 @@ const char *loader_boot_payload(uintptr_t rd_start, uintptr_t rd_end, int verify
 		while (t - t0 < f / 1000 * BOOT_PAUSE_MS);
 	}
 #endif
-	mmu_off_jump(entry_pa, ba_pa, wb);
+	mmu_off_jump(entry_pa, ba_pa, wb, (uintptr_t)con_fb);
 }
