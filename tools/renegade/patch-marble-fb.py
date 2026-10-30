@@ -156,6 +156,10 @@ PATCHES = (
      '_hfs_freeblks: ldr w0, [x0, #0x2d8]; cbnz w0, #8; mov w0, #0x1000; ret (bypass reserveBlocks clamp, prevent ENOSPC/Code 640)'),
     (0x511918, bytes.fromhex('1f500071'), bytes.fromhex('c0035fd6'),
      '_sweet_early_mark: return immediately (eliminate bottom debug color blocks)'),
+    (0xb52cd0, bytes.fromhex('fa03182a'), bytes.fromhex('9a738252'),
+     '_SweetBattery::publish: mov w26, #5020 (set AppleRawCurrentCapacity = 5020 mAh, fix 1% battery bug)'),
+    (0xb53f18, bytes.fromhex('c8030034'), bytes.fromhex('1f2003d5'),
+     '_SweetBattery::start: nop cbz (keep 30s battery periodic timer active in static fallback mode)'),
 )
 
 
