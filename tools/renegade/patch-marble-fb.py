@@ -166,8 +166,18 @@ PATCHES = (
      '_sweet_spmi_init: cmp w9, #0x401 (allow up to 1024 APIDs for SM7475 SPMI arbiter)'),
     (0x5826ac, bytes.fromhex('a2010054'), bytes.fromhex('1f2003d5'),
      '_sweet_spmi_init: nop b.cs 0x5826e0 (allow SM7475 SPMI arbiter 0x70000000)'),
-    (0x57c37c, bytes.fromhex('ff8304d1fc6f0ca9'), bytes.fromhex('c0035fd61f2003d5'),
-     '_sweet_keys_init: return immediately (disable beryllium keys to prevent data abort on SM7475)'),
+    (0x57c4cc, bytes.fromhex('8088a152'), bytes.fromhex('0088a152'),
+     '_sweet_keys_init: SP_CORE_PA 0xc440000 -> 0xc400000 (marble spmi0 core)'),
+    (0x57c4e0, bytes.fromhex('000094520088a172'), bytes.fromhex('00d495524088a172'),
+     '_sweet_keys_init: SP_CFG_PA 0xc40a000 -> 0xc42d000 (marble spmi0 cnfg)'),
+    (0x57c4f8, bytes.fromhex('00cca152'), bytes.fromhex('8088a152'),
+     '_sweet_keys_init: SP_OBS_PA 0xe600000 -> 0xc440000 (marble spmi0 obsrvr)'),
+    (0x57c554, bytes.fromhex('e3030054'), bytes.fromhex('1f2003d5'),
+     '_sweet_keys_init: nop b.lo (allow SM7475 SPMI arbiter 0x70000000)'),
+    (0x57c55c, bytes.fromhex('7f060871'), bytes.fromhex('7f100871'),
+     '_sweet_keys_init: cmp w19, #0x401 (allow up to 1024 APIDs for SM7475 SPMI arbiter)'),
+    (0x57c560, bytes.fromhex('82030054'), bytes.fromhex('1f2003d5'),
+     '_sweet_keys_init: nop b.hs (allow SM7475 SPMI arbiter 0x70000000)'),
     (0x5828bc, bytes.fromhex('08080037'), bytes.fromhex('1f2003d5'),
      '_sweet_spmi_read: nop tbnz allowed check (allow reading PMIC PON/chgr/batt registers)'),
     (0xb524f0, bytes.fromhex('80738252'), bytes.fromhex('00718252'),
@@ -187,7 +197,11 @@ PATCHES = (
     (0xb53788,
      bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
      bytes.fromhex('c109805202ea81520300805204008052050080520600805207008052'),
-     '_SweetBattery::poll: 78% 3920mV 0mA external=0 charging=0 (discharging, remove fake lightning bolt)'),
+     '_SweetBattery::pollBeryllium: 78% 3920mV 0mA external=0 charging=0 (discharging, remove fake lightning bolt)'),
+    (0xb53bf8,
+     bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
+     bytes.fromhex('c109805202ea81520300805204008052050080520600805207008052'),
+     '_SweetBattery::poll fallback: 78% 3920mV 0mA external=0 charging=0 (discharging, remove fake lightning bolt)'),
 )
 
 
@@ -203,13 +217,13 @@ def main():
         data[off:off + len(new)] = new
         print(f'{off:#x}: {what}')
 
-    # Inject native Marble touch & gesture engine into _touch_thread (0x330e9c)
-    touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'touch_engine.bin')
+    # Inject native Marble Goodix hardware touch driver into _touch_thread (0x57d284)
+    touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marble_touch.bin')
     if os.path.exists(touch_bin):
         touch_code = open(touch_bin, 'rb').read()
-        touch_off = 0x330e9c
+        touch_off = 0x57d284
         data[touch_off:touch_off + len(touch_code)] = touch_code
-        print(f'{touch_off:#x}: injected Marble touch & gesture engine ({len(touch_code)} bytes)')
+        print(f'{touch_off:#x}: injected native Marble Goodix hardware touch driver ({len(touch_code)} bytes)')
 
     open(dst, 'wb').write(data)
     print(f'wrote {dst} ({len(data)} bytes)')
