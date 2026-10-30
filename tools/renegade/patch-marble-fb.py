@@ -211,11 +211,11 @@ def main():
         data[off:off + len(new)] = new
         print(f'{off:#x}: {what}')
 
-    # Inject native Marble Goodix hardware touch driver into _touch_thread (0x581284)
+    # Inject native Marble Goodix hardware touch driver into _touch_thread (0x57d284)
     touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marble_touch.bin')
     if os.path.exists(touch_bin):
         touch_code = open(touch_bin, 'rb').read()
-        touch_off = 0x581284
+        touch_off = 0x57d284
         data[touch_off:touch_off + len(touch_code)] = touch_code
         print(f'{touch_off:#x}: injected native Marble Goodix hardware touch driver ({len(touch_code)} bytes)')
 

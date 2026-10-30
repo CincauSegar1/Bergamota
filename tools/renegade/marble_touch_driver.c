@@ -38,7 +38,7 @@ typedef int (*sweet_spmi_read_fn)(unsigned sid, unsigned addr, uint8_t *out);
 #define SWEET_HID_TOUCH_ADDR  0xfffffe0007b5a28cULL
 #define SWEET_HID_KEY_ADDR    0xfffffe0007b5a1a0ULL
 #define PRINTF_ADDR           0xfffffe00073a31d0ULL
-#define SWEET_SPMI_READ_ADDR  0xfffffe000758270cULL
+#define SWEET_SPMI_READ_ADDR  0xfffffe000758670cULL
 
 #define TLMM_PHYS             0x0f000000ULL
 #define TLMM_SIZE             0x20000ULL
