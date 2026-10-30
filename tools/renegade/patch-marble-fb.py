@@ -184,14 +184,18 @@ PATCHES = (
      'AppleCLCD::blackout: return immediately (never wipe framebuffer to black)'),
     (0xb4d0d8, bytes.fromhex('17913e39'), bytes.fromhex('1f913e39'),
      'IOMobileFramebufferUserClient::externalMethod: strb wzr, [x8, #0xfa4] (never set fPowerOff to 1, inhibit screen blackout)'),
+    (0x511960,
+     bytes.fromhex('1f2003d5083a009008694fb909810071a30200548a2a0b534a9d08328b06140b6b6d1c536cc100110d3a0090adb947f90e3a0090ce794fb9cf7d091bf0030baaf101100baa5931b8100600911f020ceb83ffff5429050011ef010e8b3f01086be3feff549f3f03d5f30300aa1aa078395bd0503904000014f30300aa1b0080521a008052f64100b0dc324eb9e84100b015b17839680a80523900805257dcffb0f7ca2c91f84100b018d3389105000014e86a7938390700913f3700f1800100549aff07379fff17f1a9969f1a89000037086b3c389c070091dc320eb9bbfeff34001d0013ddfeff97f2ffff17f70313aa68a27839da324eb9e94100b0'),
+     bytes.fromhex('090090d269f8a0f209c0dff2e9fffff22a0140f94a0200b5fd7bbfa9fd030091000091d2e04da1f20100825288d986d248eaa0f208c0dff2e8fffff200013fd6fd7bc1a8ea0300aa090090d269f8a0f209c0dff2e9fffff22a0100f9aa0000b4481140b91f010c72e4079f1a0200001404008052e503042ae603042a0700805248e03bd509008cd24995a8f20809c99a24010035490180520b09c99a6ba1099bc10a805221000b4b02ea81520300805208000014890280520b09c99a6ba1099b010a805221000b0b820a825283bb8052e00313aa88638cd2a8f6a0f208c0dff2e8fffff200013fd608838fd2a8f6a0f208c0dff2e8fffff200011fd6'),
+     'dead code at _sweet_early_mark+0x48: dynamic battery charging & SOC trampoline'),
     (0xb53788,
      bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
-     bytes.fromhex('c109805202ea81520300805204008052050080520600805207008052'),
-     '_SweetBattery::pollBeryllium: 78% 3920mV 0mA external=0 charging=0 (discharging, remove fake lightning bolt)'),
+     bytes.fromhex('76f8e6171f2003d51f2003d51f2003d51f2003d51f2003d51f2003d5'),
+     '_SweetBattery::pollBeryllium: branch to dynamic battery trampoline at 0x511960'),
     (0xb53bf8,
      bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
-     bytes.fromhex('c109805202ea81520300805204008052050080520600805207008052'),
-     '_SweetBattery::poll fallback: 78% 3920mV 0mA external=0 charging=0 (discharging, remove fake lightning bolt)'),
+     bytes.fromhex('5af7e6171f2003d51f2003d51f2003d51f2003d51f2003d51f2003d5'),
+     '_SweetBattery::poll fallback: branch to dynamic battery trampoline at 0x511960'),
 )
 
 

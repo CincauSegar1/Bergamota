@@ -77,7 +77,9 @@ static bool gpio_get(volatile uint32_t *tlmm, int pin) {
 }
 
 static void spi_delay(void) {
-    for (volatile int i = 0; i < 30; i++) {}
+    for (volatile int i = 0; i < 1500; i++) {
+        __asm__ volatile("nop");
+    }
 }
 
 static void spi_transfer_byte(struct marble_touch_ctx *ctx, uint8_t out, uint8_t *in) {
@@ -104,16 +106,16 @@ static bool goodix_read(struct marble_touch_ctx *ctx, uint32_t address, uint8_t 
     tx[5] = 0xff; tx[6] = 0xff; tx[7] = 0xff;
 
     gpio_set(ctx->tlmm, PIN_CS, 0);
-    spi_delay();
+    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
     for (int i = 0; i < 8; i++) {
         spi_transfer_byte(ctx, tx[i], 0);
     }
     for (uint32_t i = 0; i < length; i++) {
         spi_transfer_byte(ctx, 0xff, &data[i]);
     }
-    spi_delay();
+    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
     gpio_set(ctx->tlmm, PIN_CS, 1);
-    spi_delay();
+    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
     return true;
 }
 
@@ -126,16 +128,16 @@ static bool goodix_write(struct marble_touch_ctx *ctx, uint32_t address, const u
     tx[4] = (uint8_t)address;
 
     gpio_set(ctx->tlmm, PIN_CS, 0);
-    spi_delay();
+    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
     for (int i = 0; i < 5; i++) {
         spi_transfer_byte(ctx, tx[i], 0);
     }
     for (uint32_t i = 0; i < length; i++) {
         spi_transfer_byte(ctx, data[i], 0);
     }
-    spi_delay();
+    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
     gpio_set(ctx->tlmm, PIN_CS, 1);
-    spi_delay();
+    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
     return true;
 }
 
@@ -187,11 +189,11 @@ void marble_touch_entry(void) {
     gpio_set(ctx.tlmm, PIN_CLK, 0);
     gpio_set(ctx.tlmm, ctx.pin_mosi, 0);
 
-    // Fast pulse reset: low 5ms, high 20ms
+    // Full Berlin-D GT9916R hardware reset sequence: CS held HIGH
     gpio_set(ctx.tlmm, PIN_RESET, 0);
-    delay(5, 1000000);
+    delay(20, 1000000); // 20ms low
     gpio_set(ctx.tlmm, PIN_RESET, 1);
-    delay(20, 1000000);
+    delay(100, 1000000); // 100ms post-reset boot time
 
     // Read Version (0x10014, 28 bytes)
     uint8_t version[28];
@@ -243,6 +245,9 @@ void marble_touch_entry(void) {
                 }
             }
         }
+    }
+    if (touch_address == 0 || touch_address < 0x10000 || touch_address > 0x80000) {
+        touch_address = 0x10200;
     }
     kprint("SWEET TOUCH: report address 0x%05x\n", touch_address);
 
