@@ -9,7 +9,11 @@
 #include "charge.h"
 #include "artdraw.h"
 
+#if defined(BOARD_MARBLE)
+static uint32_t host_fb[0x01800000 / 4];
+#else
 static uint32_t host_fb[FB_H * FB_STRIDE / 4];
+#endif
 
 static void dump(const char *path)
 {

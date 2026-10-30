@@ -89,10 +89,7 @@ void bootui_init(void)
 	con_clear(0xff000000U);
 	bootui_draw_rle(applelogo_pal, applelogo_rle, APPLELOGO_W, APPLELOGO_H,
 			(FB_W - APPLELOGO_W) / 2, (FB_H - APPLELOGO_H) / 2);
-	con_set_bg(0xff000000U);
-	con_set_scale(1);
-	con_window(80, 100);
-	con_replay();
+	con_window(0, -1);
 	active = 1;
 	return;
 #endif
@@ -113,7 +110,9 @@ void bootui_init(void)
 void bootui_handoff(void)
 {
 #ifdef HAVE_APPLELOGO
-	/* Keep Apple logo in center and logs on the left side intact across handoff */
+	con_clear(0xff000000U);
+	bootui_draw_rle(applelogo_pal, applelogo_rle, APPLELOGO_W, APPLELOGO_H,
+			(FB_W - APPLELOGO_W) / 2, (FB_H - APPLELOGO_H) / 2);
 	active = 0;
 #endif
 }
@@ -132,7 +131,6 @@ static void bar_to(unsigned permille)
 void bootui_progress(unsigned permille, const char *s)
 {
 #ifdef HAVE_APPLELOGO
-	con_str("BOOT", s);
 	return;
 #endif
 	bar_to(permille);

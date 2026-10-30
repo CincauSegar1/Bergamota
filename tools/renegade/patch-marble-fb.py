@@ -147,6 +147,8 @@ PATCHES = (
      '_hfs_getnewvnode: line 946 nop b.lo (bypass c_totalblocks < cf_blocks check)'),
     (0x867e60, bytes.fromhex('a8000054'), bytes.fromhex('1f2003d5'),
      '_hfs_getnewvnode: line 946 nop b.hi (bypass logicalSize > cf_blocks check)'),
+    (0x853df0, bytes.fromhex('0d010054'), bytes.fromhex('0b010054'),
+     '_MapFileBlockC: line 628 b.lt instead of b.le (allow tmpOff == 0 at extent boundary, bypass EINVAL)'),
     (0x511918, bytes.fromhex('1f500071'), bytes.fromhex('c0035fd6'),
      '_sweet_early_mark: return immediately (eliminate bottom debug color blocks)'),
 )
