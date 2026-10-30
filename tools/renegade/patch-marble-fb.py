@@ -197,14 +197,6 @@ def main():
         data[off:off + len(new)] = new
         print(f'{off:#x}: {what}')
 
-    # Inject Marble Goodix GT9916R hardware SPI touchscreen driver into _touch_thread
-    touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marble_touch.bin')
-    if os.path.exists(touch_bin):
-        touch_code = open(touch_bin, 'rb').read()
-        touch_off = 0x57d284
-        data[touch_off:touch_off + len(touch_code)] = touch_code
-        print(f'{touch_off:#x}: injected marble Goodix GT9916R SPI touch driver ({len(touch_code)} bytes)')
-
     open(dst, 'wb').write(data)
     print(f'wrote {dst} ({len(data)} bytes)')
 
