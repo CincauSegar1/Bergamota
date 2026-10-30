@@ -196,10 +196,13 @@ PATCHES = (
      bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
      bytes.fromhex('f2a1e8171f2003d51f2003d51f2003d51f2003d51f2003d51f2003d5'),
      '_SweetBattery::poll fallback: branch to dynamic battery trampoline 2 at 0x57c3c0'),
-    (0x8dde2c,
-     bytes.fromhex('e00313aae10314aa1b3f0c944e3f0c94'),
-     bytes.fromhex('00008052f8ffff171f2003d51f2003d5'),
-     '_reboot_kernel: bypass launchd userspace early boot task failure panic (tzinit exit 3)'),
+    (0x51a004, bytes.fromhex('1f2003d5') * 35,
+     bytes.fromhex('02d4179148004039490440390821092a490840390841092a490c40390861092a894e8f5229cdad721f01096b40020054696c8c52e9cbac721f01096bc0010054692e8f52696eae721f01096b40010054c92c8d52c92dad721f01096bc0000054a9ed8d52492cad721f01096b400000540200001401008052030080522400805205008052060080d2b3ab0e14'),
+     'trampoline at 0x51a004: force clean exit status (rv=0) for tzinit and boot tasks before _exit_with_reason'),
+    (0x8c4f3c,
+     bytes.fromhex('030080522400805205008052060080d203000014'),
+     bytes.fromhex('3254f1171f2003d51f2003d51f2003d51f2003d5'),
+     '_exit1: branch to boot task clean exit trampoline at 0x51a004 (bypasses userspace early boot task failure panic)'),
 )
 
 
