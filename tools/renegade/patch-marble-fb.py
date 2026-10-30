@@ -196,6 +196,10 @@ PATCHES = (
      bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
      bytes.fromhex('f2a1e8171f2003d51f2003d51f2003d51f2003d51f2003d51f2003d5'),
      '_SweetBattery::poll fallback: branch to dynamic battery trampoline 2 at 0x57c3c0'),
+    (0x8dde2c,
+     bytes.fromhex('e00313aae10314aa1b3f0c944e3f0c94'),
+     bytes.fromhex('00008052f8ffff171f2003d51f2003d5'),
+     '_reboot_kernel: bypass launchd userspace early boot task failure panic (tzinit exit 3)'),
 )
 
 
