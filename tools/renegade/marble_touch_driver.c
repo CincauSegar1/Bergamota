@@ -4,14 +4,15 @@
  *
  * Bus: Cape QUPv3 SE4 SPI
  * Pins:
- *   GPIO 16: MISO (or MOSI depending on pinout)
- *   GPIO 17: MOSI
- *   GPIO 18: CLK
- *   GPIO 19: CS (Active Low)
- *   GPIO 20: RESET (Active Low)
+ *   GPIO 16: MOSI (qup0_se4 pad 0)
+ *   GPIO 17: MISO (qup0_se4 pad 1)
+ *   GPIO 18: CLK  (qup0_se4 pad 2)
+ *   GPIO 19: CS   (qup0_se4 pad 3, Active Low)
+ *   GPIO 20: RESET (Active Low, held HIGH)
  *   GPIO 21: IRQ / INT (Falling edge / Low on contact)
  *
- * Cape TLMM GPIO Bank: 0x0f000000 (SM7475 Cape PINCTRL REG_BASE, marble DTS line 912)
+ * Cape TLMM GPIO Bank: 0x0f000000 (SM7475 Cape PINCTRL REG_BASE)
+ * PMK8350 SPMI Core: 0x0c400000, PON status SID 0 addr 0x0810 (Bit 0 = Power Key)
  *
  * NOTE: This driver is injected into the read-only __TEXT_EXEC segment (_touch_thread).
  * ALL state variables MUST reside exclusively on the execution stack. ZERO writes to
@@ -30,18 +31,20 @@ typedef void (*delay_fn)(uint32_t interval, uint32_t unit_in_ns);
 typedef void (*sweet_hid_touch_fn)(int finger, int down, int x, int y);
 typedef void (*sweet_hid_key_fn)(int key, int down);
 typedef int (*printf_fn)(const char *fmt, ...);
+typedef int (*sweet_spmi_read_fn)(unsigned sid, unsigned addr, uint8_t *out);
 
 #define ML_IO_MAP_ADDR        0xfffffe00075236ccULL
 #define DELAY_ADDR            0xfffffe00073742a4ULL
 #define SWEET_HID_TOUCH_ADDR  0xfffffe0007b5a28cULL
 #define SWEET_HID_KEY_ADDR    0xfffffe0007b5a1a0ULL
 #define PRINTF_ADDR           0xfffffe00073a31d0ULL
+#define SWEET_SPMI_READ_ADDR  0xfffffe000758670cULL
 
 #define TLMM_PHYS             0x0f000000ULL
 #define TLMM_SIZE             0x20000ULL
 
-#define PIN_MISO_DEFAULT      16
-#define PIN_MOSI_DEFAULT      17
+#define PIN_MOSI_DEFAULT      16
+#define PIN_MISO_DEFAULT      17
 #define PIN_CLK               18
 #define PIN_CS                19
 #define PIN_RESET             20
@@ -82,7 +85,7 @@ static bool gpio_get(volatile uint32_t *tlmm, int pin) {
 }
 
 static void spi_delay(void) {
-    for (volatile int i = 0; i < 1500; i++) {
+    for (volatile int i = 0; i < 300; i++) {
         __asm__ volatile("nop");
     }
 }
@@ -94,7 +97,7 @@ static void spi_transfer_byte(struct marble_touch_ctx *ctx, uint8_t out, uint8_t
         spi_delay();
         gpio_set(ctx->tlmm, PIN_CLK, 1);
         spi_delay();
-        rx = (rx << 1) | gpio_get(ctx->tlmm, ctx->pin_miso);
+        rx = (rx << 1) | (gpio_get(ctx->tlmm, ctx->pin_miso) ? 1 : 0);
         gpio_set(ctx->tlmm, PIN_CLK, 0);
         spi_delay();
     }
@@ -111,16 +114,16 @@ static bool goodix_read(struct marble_touch_ctx *ctx, uint32_t address, uint8_t 
     tx[5] = 0xff; tx[6] = 0xff; tx[7] = 0xff;
 
     gpio_set(ctx->tlmm, PIN_CS, 0);
-    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
+    spi_delay();
     for (int i = 0; i < 8; i++) {
         spi_transfer_byte(ctx, tx[i], 0);
     }
     for (uint32_t i = 0; i < length; i++) {
-        spi_transfer_byte(ctx, 0xff, &data[i]);
+        spi_transfer_byte(ctx, 0, &data[i]);
     }
-    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
+    spi_delay();
     gpio_set(ctx->tlmm, PIN_CS, 1);
-    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
+    spi_delay();
     return true;
 }
 
@@ -133,16 +136,16 @@ static bool goodix_write(struct marble_touch_ctx *ctx, uint32_t address, const u
     tx[4] = (uint8_t)address;
 
     gpio_set(ctx->tlmm, PIN_CS, 0);
-    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
+    spi_delay();
     for (int i = 0; i < 5; i++) {
         spi_transfer_byte(ctx, tx[i], 0);
     }
     for (uint32_t i = 0; i < length; i++) {
         spi_transfer_byte(ctx, data[i], 0);
     }
-    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
+    spi_delay();
     gpio_set(ctx->tlmm, PIN_CS, 1);
-    for (volatile int i = 0; i < 5000; i++) { __asm__ volatile("nop"); }
+    spi_delay();
     return true;
 }
 
@@ -167,10 +170,15 @@ void marble_touch_entry(void) {
     sweet_hid_touch_fn hid_touch = (sweet_hid_touch_fn)SWEET_HID_TOUCH_ADDR;
     sweet_hid_key_fn hid_key = (sweet_hid_key_fn)SWEET_HID_KEY_ADDR;
     printf_fn kprint = (printf_fn)PRINTF_ADDR;
+    sweet_spmi_read_fn spmi_read = (sweet_spmi_read_fn)SWEET_SPMI_READ_ADDR;
 
     struct marble_touch_ctx ctx;
-    ctx.pin_miso = PIN_MISO_DEFAULT;
-    ctx.pin_mosi = PIN_MOSI_DEFAULT;
+    ctx.pin_mosi = PIN_MOSI_DEFAULT; // 16
+    ctx.pin_miso = PIN_MISO_DEFAULT; // 17
+
+    // Hardware button state trackers
+    bool pwr_prev = false;
+    bool voldn_prev = false;
 
     // Fast stabilization delay (100ms)
     delay(100, 1000000);
@@ -185,53 +193,51 @@ void marble_touch_entry(void) {
         }
     }
 
-    // Configure GPIO pins
-    gpio_cfg(ctx.tlmm, 16, 0, 3, 6, false); // pin 16
-    gpio_cfg(ctx.tlmm, 17, 0, 3, 6, true);  // pin 17
-    gpio_cfg(ctx.tlmm, PIN_CLK, 0, 0, 6, true);   // clk out
-    gpio_cfg(ctx.tlmm, PIN_CS, 0, 3, 16, true);   // cs out, pull up
-    gpio_cfg(ctx.tlmm, PIN_RESET, 0, 3, 8, true); // reset out, pull up
-    gpio_cfg(ctx.tlmm, PIN_INT, 0, 3, 8, false);  // irq in, pull up
+    // Configure GPIO pins for Cape SPI SE4 + Goodix TS
+    gpio_cfg(ctx.tlmm, ctx.pin_mosi, 0, 0, 6, true);  // pin 16: MOSI out
+    gpio_cfg(ctx.tlmm, ctx.pin_miso, 0, 3, 6, false); // pin 17: MISO in, pull-up
+    gpio_cfg(ctx.tlmm, PIN_CLK, 0, 0, 6, true);        // pin 18: CLK out
+    gpio_cfg(ctx.tlmm, PIN_CS, 0, 3, 16, true);        // pin 19: CS out, pull-up
+    gpio_cfg(ctx.tlmm, PIN_RESET, 0, 3, 8, true);      // pin 20: RESET out, pull-up
+    gpio_cfg(ctx.tlmm, PIN_INT, 0, 3, 8, false);       // pin 21: IRQ in, pull-up
 
+    // Keep RESET held HIGH at all times! (Do not toggle low to avoid wiping running firmware)
+    gpio_set(ctx.tlmm, PIN_RESET, 1);
     gpio_set(ctx.tlmm, PIN_CS, 1);
     gpio_set(ctx.tlmm, PIN_CLK, 0);
     gpio_set(ctx.tlmm, ctx.pin_mosi, 0);
 
-    // Full Berlin-D GT9916R hardware reset sequence: CS held HIGH
-    gpio_set(ctx.tlmm, PIN_RESET, 0);
-    delay(20, 1000000); // 20ms low
-    gpio_set(ctx.tlmm, PIN_RESET, 1);
-    delay(100, 1000000); // 100ms post-reset boot time
+    delay(50, 1000000); // 50ms pin stabilization
 
     // Read Version (0x10014, 28 bytes)
     uint8_t version[28];
     bool probed = false;
     for (int attempt = 0; attempt < 2; attempt++) {
         if (attempt == 0) {
-            ctx.pin_miso = 16;
-            ctx.pin_mosi = 17;
-            gpio_cfg(ctx.tlmm, 16, 0, 3, 6, false);
-            gpio_cfg(ctx.tlmm, 17, 0, 0, 6, true);
-        } else {
-            ctx.pin_miso = 17;
             ctx.pin_mosi = 16;
-            gpio_cfg(ctx.tlmm, 17, 0, 3, 6, false);
+            ctx.pin_miso = 17;
             gpio_cfg(ctx.tlmm, 16, 0, 0, 6, true);
+            gpio_cfg(ctx.tlmm, 17, 0, 3, 6, false);
+        } else {
+            ctx.pin_mosi = 17;
+            ctx.pin_miso = 16;
+            gpio_cfg(ctx.tlmm, 17, 0, 0, 6, true);
+            gpio_cfg(ctx.tlmm, 16, 0, 3, 6, false);
         }
         if (goodix_read(&ctx, 0x10014, version, 28) && version[0] != 0 && version[0] != 0xff) {
-            kprint("SWEET TOUCH: Goodix GT9916R found! IC=%.6s FW=%.8s (miso=%d mosi=%d)\n",
-                   (const char *)version, (const char *)version + 10, ctx.pin_miso, ctx.pin_mosi);
+            kprint("SWEET TOUCH: Goodix GT9916R found! IC=%.6s FW=%.8s (mosi=%d miso=%d)\n",
+                   (const char *)version, (const char *)version + 10, ctx.pin_mosi, ctx.pin_miso);
             probed = true;
             break;
         }
     }
 
     if (!probed) {
-        kprint("SWEET TOUCH: Goodix GT9916R probe fallback to default pinout (16/17)\n");
-        ctx.pin_miso = 16;
-        ctx.pin_mosi = 17;
-        gpio_cfg(ctx.tlmm, 16, 0, 3, 6, false);
-        gpio_cfg(ctx.tlmm, 17, 0, 0, 6, true);
+        kprint("SWEET TOUCH: Goodix GT9916R probe fallback to default pinout (mosi=16 miso=17)\n");
+        ctx.pin_mosi = 16;
+        ctx.pin_miso = 17;
+        gpio_cfg(ctx.tlmm, 16, 0, 0, 6, true);
+        gpio_cfg(ctx.tlmm, 17, 0, 3, 6, false);
     }
 
     uint32_t touch_address = 0x10200;
@@ -277,6 +283,26 @@ void marble_touch_entry(void) {
         delay(8, 1000000); // 8ms sleep = 125 Hz
         idle_ticks++;
 
+        // 1. Native Hardware Power & Volume Keys via Qualcomm SPMI PMK8350 PON
+        if (spmi_read) {
+            uint8_t pon_sts = 0;
+            if (spmi_read(0, 0x0810, &pon_sts) == 0) {
+                bool pwr_down = (pon_sts & 1) != 0;
+                if (pwr_down != pwr_prev) {
+                    pwr_prev = pwr_down;
+                    hid_key(0, pwr_down ? 1 : 0);
+                    kprint("SWEET KEY: hardware power button %s\n", pwr_down ? "DOWN" : "UP");
+                }
+                bool voldown = (pon_sts & 2) != 0;
+                if (voldown != voldn_prev) {
+                    voldn_prev = voldown;
+                    hid_key(2, voldown ? 1 : 0);
+                    kprint("SWEET KEY: hardware vol- button %s\n", voldown ? "DOWN" : "UP");
+                }
+            }
+        }
+
+        // 2. Touch Screen Polling
         bool irq_active = !gpio_get(ctx.tlmm, PIN_INT);
         if (!irq_active && (idle_ticks < 10)) {
             // No touch interrupt and not at 80ms watchdog tick
