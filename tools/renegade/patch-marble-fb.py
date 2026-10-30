@@ -106,12 +106,6 @@ PATCHES = (
      'root volume auth: show bypassed instead of unauthenticated warning'),
     (0x57b828, bytes.fromhex('6a8ef897'), bytes.fromhex('1f2003d5'),
      'sweet_ufs_syncer: nop bl printf (silence SWEET UFS STATS console spam)'),
-    (0x57d2bc, bytes.fromhex('a8058052'), bytes.fromhex('08018052'),
-     '_touch_thread: initial delay default 45s -> 8s for fast auto-unlock'),
-    (0x57d328,
-     bytes.fromhex('17370090e81a44f9080140f9e80300f940d9ffd000f81991a487f8970002a052c100a052e088fe97995e00f039231991200700f9610274b20072a052da88fe97200b00f9e81a44f9000940b901008852d588fe97200300f9280740f9280800b4280b40f9e80700b4c00700b4e81a44f908d14039080a0034d407009480070034b808009440070034955e00f0a82e43f994009052086974b8bf3103d5a92e43f98a00925229696ab8bf3103d5aa2e43f96a020a8b4a0540b9bf3103d5e9ab00a9e80300f940d9ffd000841c917787f897a82e43f909009252086969b8bf3103d56a18805248250033aa2e43f9bf3203d5486929b89f3303d5a82e43f909009052086969b8bf3103d5aa2e43f94b6974b8bf3103d56b791e12bf3203d54b6934b89f3303d57458805288260033aa2e43f9bf3203d5486929b89f3303d540d9ffd000a81d9101908152e213009400380034e00300f940d9ffd000c41d910300001440d9ffd000801a915087f897f783fe975866f997000080d2a6bef897a88359f8a93c00901f2003d5291544f93f0108eba1f10054ff030791fd7b45a9f44f44a9f65743a9f85f42a9fa6741a9fc6fc6a8c0035fd6086440b9bf3103d5290340f9296940b9'),
-     bytes.fromhex('00488852e001a07217ccf797600080522100805299631794006a985212ccf79760008052010080529463179400a881526000a0720cccf797000080522100805242468052831f8152c763179400d0875205ccf79700008052210080524246805203fa8052c063179400d08752fecbf79700008052210080524246805203c88052b963179400d08752f7cbf79700008052210080524246805203968052b263179400d08752f0cbf79700008052210080524246805203648052ab63179400d08752e9cbf79700008052010080524246805283578052a463179400909052c003a072e1cbf797000080522100805242468052831f81529c63179400d08752dacbf79700008052210080524246805203fa80529563179400d08752d3cbf79700008052210080524246805203c880528e63179400d08752cccbf797000080522100805242468052039680528763179400d08752c5cbf797000080522100805242468052036480528063179400d08752becbf797000080520100805242468052835780527963179400249452e000a072b6cbf797600080522100805238631794006a9852b1cbf797600080520100805233631794e683fe974766f9970000805295bef897c0035fd6'),
-     '_touch_thread: auto-swipe unlock + Home gesture sequence (bypasses lock screen into SpringBoard/Hello)'),
     (0x57c1ac, bytes.fromhex('490b8052'), bytes.fromhex('89028052'),
      'sweet_sample_thread: initial sleep 90s -> 20s for fast diagnostics'),
     (0x57c20c, bytes.fromhex('e80240b909611953230d084b'), bytes.fromhex('e80240b9c9038052037d091b'),
@@ -170,22 +164,26 @@ PATCHES = (
      '_sweet_spmi_init: nop b.eq (allow SM7475 SPMI arbiter 0x70000000)'),
     (0x5826a8, bytes.fromhex('3f050871'), bytes.fromhex('3f051071'),
      '_sweet_spmi_init: cmp w9, #0x401 (allow up to 1024 APIDs for SM7475 SPMI arbiter)'),
+    (0x5826ac, bytes.fromhex('a2010054'), bytes.fromhex('1f2003d5'),
+     '_sweet_spmi_init: nop b.cs 0x5826e0 (allow SM7475 SPMI arbiter 0x70000000)'),
+    (0x57c4cc, bytes.fromhex('8088a152'), bytes.fromhex('0088a152'),
+     'sweet_keys: KEYS_CORE_PA 0xc440000 -> 0xc400000 (marble spmi0 core)'),
+    (0x57c4e0, bytes.fromhex('000094520088a172'), bytes.fromhex('00009a524088a172'),
+     'sweet_keys: KEYS_CNFG_PA 0xc40a000 -> 0xc42d000 (marble spmi0 cnfg)'),
+    (0x57c4f8, bytes.fromhex('00cca152'), bytes.fromhex('8088a152'),
+     'sweet_keys: KEYS_OBS_PA 0xe600000 -> 0xc440000 (marble spmi0 obsrvr)'),
+    (0x57c554, bytes.fromhex('e3030054'), bytes.fromhex('1f2003d5'),
+     'sweet_keys: nop b.hi (allow SM7475 SPMI arbiter 0x70000000)'),
+    (0x57c558, bytes.fromhex('d3030034'), bytes.fromhex('1f2003d5'),
+     'sweet_keys: nop cbz (allow SM7475 SPMI arbiter count)'),
+    (0x57c560, bytes.fromhex('82030054'), bytes.fromhex('1f2003d5'),
+     'sweet_keys: nop b.hi (allow up to 1024 APIDs for SM7475 SPMI arbiter)'),
     (0x5828bc, bytes.fromhex('08080037'), bytes.fromhex('1f2003d5'),
      '_sweet_spmi_read: nop tbnz allowed check (allow reading PMIC PON/chgr/batt registers)'),
-    (0x582918, bytes.fromhex('0ce08052'), bytes.fromhex('0cc08352'),
-     '_sweet_spmi_read: mov w12, #0x1e00 (SPMIv7 APID table offset 0x2000 for SM7475)'),
-    (0x582b48, bytes.fromhex('0de08052'), bytes.fromhex('0dc08352'),
-     '_sweet_spmi_write: mov w13, #0x1e00 (SPMIv7 APID table offset 0x2000 for SM7475)'),
     (0xb524f0, bytes.fromhex('80738252'), bytes.fromhex('00718252'),
      '_SweetBattery::publish: mov w0, #5000 (NominalChargeCapacity = 5000 mAh for Poco F5 BM5G)'),
     (0xb52d40, bytes.fromhex('80738252'), bytes.fromhex('00718252'),
      '_SweetBattery::publish: mov w0, #5000 (AppleRawMaxCapacity = 5000 mAh for Poco F5 BM5G)'),
-    (0xb52cd0, bytes.fromhex('fa03182a'), bytes.fromhex('dabb8152'),
-     '_SweetBattery::publish: mov w26, #3550 (AppleRawCurrentCapacity = 3550 mAh, 71% of 5000 mAh)'),
-    (0xb53bf8,
-     bytes.fromhex('810c8052020d82520300805224008052250080520600805227008052'),
-     bytes.fromhex('e108805282e78152a32b801204008052050080520600805207008052'),
-     '_SweetBattery::poll: 71% 3900mV -350mA external=0 charging=0 (discharging, no fake lightning bolt)'),
     (0xb53f18, bytes.fromhex('c8030034'), bytes.fromhex('1f2003d5'),
      '_SweetBattery::start: nop cbz (keep 30s battery periodic timer active in static fallback mode)'),
     (0xb2b0a0, bytes.fromhex('ff8301d1'), bytes.fromhex('c0035fd6'),
@@ -208,6 +206,15 @@ def main():
             raise SystemExit(f'{src}: {off:#x}: expected {old.hex()}, got {got.hex()} ({what})')
         data[off:off + len(new)] = new
         print(f'{off:#x}: {what}')
+
+    # Inject Marble Goodix GT9916R hardware SPI touchscreen driver into _touch_thread
+    touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marble_touch.bin')
+    if os.path.exists(touch_bin):
+        touch_code = open(touch_bin, 'rb').read()
+        touch_off = 0x57d284
+        data[touch_off:touch_off + len(touch_code)] = touch_code
+        print(f'{touch_off:#x}: injected marble Goodix GT9916R SPI touch driver ({len(touch_code)} bytes)')
+
     open(dst, 'wb').write(data)
     print(f'wrote {dst} ({len(data)} bytes)')
 
