@@ -1,5 +1,12 @@
 # iOS 18 on marble (Xiaomi Poco F5 / Redmi Note 12 Turbo, Qualcomm SM7475) & sweet / beryllium
 
+## Active handoff — 2026-10-31 framebuffer stall
+- Read `/storage/emulated/0/buat filenya disini/log_apple_ios18_20261031_214107.txt`: `sysstatuscheck` is already skipped as an optional task; boot continues through `backboardd` and `SpringBoard`, and no HFS `cat_delete`/HFSINC error appears in this log.
+- New observed issue: framebuffer reports `mode=copy hw=0 flip=0`, with one swap and zero copied frames through roughly 312 seconds. The screen remains on the loader Apple logo while userspace daemons continue. `Setup` is repeatedly terminated with SIGKILL, but this log does not identify the sender or reason.
+- Change: default full-boot CMDLINE now requests `sweetfb_direct=1` and sets `sweetfb_swapsync=0`, allowing direct hardware scale/page-flip/zero-copy presentation while disabling potentially blocking swap waits. Driver should fall back to timed copies if SMMU bypass is not verified. This is a targeted boot-path fix, not yet confirmed on-device.
+- Build: `BOARD=marble bash tools/renegade/mkboot-full.sh` completed 2026-10-31; produced v4 SHA-256 `0ec3b0b5bd01bc946551d0e718dd06bb413f78fe64b825c40bc46c60a432341f` and v2 SHA-256 `16ec0197a43ba631dc55c3242ac46faeb856766193b348ca15fadd8ca36352c1`. Copied both images to the five standard user locations. Build output included the existing `fastboot_test` target (511 checks, 0 failures).
+- Pending: boot this image on the device and capture a new persistent log to confirm swaps/copy or zero-copy frames and determine the cause of Setup SIGKILL. GitHub push is still pending: `git push origin develop main` failed because this checkout has no configured GitHub credentials.
+
 ## Agent handoff / active work (2026-10-27, latest)
 
 ### 2026-10-28: "stuck at XNU JUMPING" was a framebuffer cache bug (build 1845-NCFB)
