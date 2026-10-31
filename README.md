@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="enxerto/applelogo.png" width="168" alt="Project Apple">
+  <img src="docs/assets/projectapple.png" alt="Project Apple">
 </p>
 
 <h1 align="center">Project Apple</h1>
