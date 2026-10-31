@@ -251,6 +251,22 @@ PATCHES = (
      bytes.fromhex('e00318aa'),
      bytes.fromhex('00008052'),
      '_hfs_swap_BTNode: return 0 unconditionally on epilogue'),
+    (0x869d74,
+     bytes.fromhex('a23a0054'),
+     bytes.fromhex('82200054'),
+     '_hfs_swap_HFSPlusBTInternalNode: on write, invalid key length (0) breaks out to success exit (prevent SWEET EARLY PANIC at hfs_endian.c:517)'),
+    (0x869db8,
+     bytes.fromhex('a82b0054'),
+     bytes.fromhex('681e0054'),
+     '_hfs_swap_HFSPlusBTInternalNode: on read, invalid key length (0) breaks out to success exit (cleanly terminate node reading without error)'),
+    (0x86a4c8,
+     bytes.fromhex('29154079'),
+     bytes.fromhex('2fffff17'),
+     '_hfs_swap_HFSPlusBTInternalNode: line 517 error path redirects directly to success exit'),
+    (0x86a4f0,
+     bytes.fromhex('40970c94'),
+     bytes.fromhex('25ffff17'),
+     '_hfs_swap_HFSPlusBTInternalNode: line 517 panic call replaced with branch to success exit'),
 )
 
 
