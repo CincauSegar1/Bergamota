@@ -27,6 +27,9 @@ if [ ! -f enxerto/applelogo.h ] || [ enxerto/applelogo.png -nt enxerto/applelogo
 		python3 tools/mkapplelogo.py --root "$ROOT_SIMG" || echo "warning: no Apple logo (Bergamota screen stays)" >&2
 	fi
 fi
+if [ "$BOARD" = "marble" ] && [ -f tools/renegade/patch-marble-fb.py ]; then
+	python3 tools/renegade/patch-marble-fb.py
+fi
 python3 tools/mkpayload.py "$KERNEL" "$ADT" enxerto/out/payload-ios18full.bin --cmdline "$CMDLINE"
 BOARD="$BOARD" bash enxerto/build.sh "$PWD/enxerto/out/payload-ios18full.bin"
 cp enxerto/out/enxerto-boot.img "$OUT"
