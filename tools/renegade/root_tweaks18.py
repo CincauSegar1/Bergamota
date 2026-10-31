@@ -586,7 +586,7 @@ QUIET_THROTTLE = {      # label -> ThrottleInterval seconds (default 10, replica
     'com.apple.replicatord': 60, 'com.apple.appprotectiond': 60, 'com.apple.passd': 60,
     'com.apple.icloud.findmydeviced': 60, 'com.apple.mobileactivationd': 60,
     'com.apple.spaceattributiond': 60, 'com.apple.fairplayd.H2': 60, 'com.apple.PerfPowerServices': 60,
-    'com.apple.webinspectord': 60,
+    'com.apple.webinspectord': 60, 'com.apple.chronoservicesd': 120, 'com.apple.chronod': 120,
 }
 QUIET_REMOVE = ('com.apple.security.cryptexd',)     # libimage4 panics 'failed to get manifest properties' (no ADT /chosen/manifest-properties); fixed by tools/mkpayload.py add_img4_nodes (rebuild the boot image), so removing the job is no longer needed
 

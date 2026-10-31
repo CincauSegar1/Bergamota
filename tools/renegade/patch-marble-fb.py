@@ -190,6 +190,8 @@ PATCHES = (
      'IOMobileFramebufferUserClient::externalMethod: skip power-off logic entirely (never blank display or set fPowerOff)'),
     (0xb4d0d8, bytes.fromhex('17913e39'), bytes.fromhex('1f913e39'),
      'IOMobileFramebufferUserClient::externalMethod: strb wzr, [x8, #0xfa4] (never set fPowerOff to 1, inhibit screen blackout)'),
+    (0xb3e410, bytes.fromhex('7502082a'), bytes.fromhex('15008052'),
+     'AppleKeyStoreUserClient::externalMethod: default ret=0 (kIOReturnSuccess) for unhandled selectors (unblock SpringBoard sel 8)'),
     (0x51a110, bytes.fromhex('1f2003d5') * 14,
      bytes.fromhex('980100b4081d40f91f0118eb4001005409e745b96aaa8c528aaeae723f010a6b8100005409a357393fc1017140000054c91b0f14331c0f14'),
      'trampoline at 0x51a110: check NULL proc, check initproc and Setup (p_comm at 0x5e4), drop fatal signals to epilogue at 0x8e1210'),
