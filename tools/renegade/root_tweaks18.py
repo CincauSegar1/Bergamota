@@ -580,8 +580,8 @@ def audio(root):
 
 # Daemons that only crash-loop or quit at once on this bring-up while containermanagerd refuses every container lookup
 # (NOTES.md 2026-10-21): 18 respawns each in the 224536 boot log, every crash = ReportCrash
-# + corpse (448 `SWEET AKS: ReportCrash` lines, "Too many corpses being created"), 1022 xpcproxy spawns in total. Off by
-# default (SWEET_QUIET=1 or --quiet turns it on): the point is less CPU competing with dropbear/backboardd while debugging.
+# + corpse (448 `SWEET AKS: ReportCrash` lines, "Too many corpses being created"), 1022 xpcproxy spawns in total. Keep
+# their retries sparse by default: otherwise the crash storm starves SpringBoard/Setup and can trigger a SIGKILL of Setup.
 QUIET_THROTTLE = {      # label -> ThrottleInterval seconds (default 10, replicatord 3, lsd 1)
     'com.apple.replicatord': 60, 'com.apple.appprotectiond': 60, 'com.apple.passd': 60,
     'com.apple.icloud.findmydeviced': 60, 'com.apple.mobileactivationd': 60,
@@ -606,6 +606,14 @@ def quiet(root):
             n += 1
     save(path, plist, st.st_uid, st.st_gid, st.st_mode & 0o7777)
     print(f'quiet: removed {len(gone)} job(s) {QUIET_REMOVE}, ThrottleInterval set on {n}')
+
+
+def quiet_enabled():
+    """Keep boot usable under expected optional-service crash loops.
+
+    SWEET_QUIET=0 is reserved for a short, focused failure capture.
+    """
+    return os.environ.get('SWEET_QUIET', '1') != '0'
 
 
 REGISTER_LIST = 'usr/local/share/renegade/register-apps'
@@ -1282,7 +1290,8 @@ def prefs(root):
     merge_pref(root, 'com.apple.migration', {
         'LastSystemVersion': BUILD, 'DMUserDataDisposition': {'SyntheticDidUpgrade': False, 'buildVersion': BUILD}})
     merge_pref(root, 'com.apple.springboard', {
-        'BKNoWatchdogs': True, 'FBLaunchWatchdogExceptions': {'com.apple.purplebuddy': 100.0},
+        'BKNoWatchdogs': True, 'FBLaunchWatchdogExceptions': {
+            'com.apple.purplebuddy': 180.0, 'Setup': 180.0},
         'MCForceShowCloudConfigurationUI': False,
         'SBShowBatteryPercentage': True})        # status-bar battery percentage (live: sweetprefs mobile com.apple.springboard SBShowBatteryPercentage bool 1)
     merge_pref(root, 'com.apple.purplebuddy', {
@@ -1317,11 +1326,10 @@ def sweetprefs_tool(root):
 def base(root):
     """Everything of the original tweaks stage that is idempotent and not an auto-fix, in build order: what `renegade
     update` runs before auto(), so an image built before a tweak existed (event_timing was only in main()) gets it.
-    Skipped on purpose: patch_mount_phase2 (opt-in), the console bring-up job (informational), the quiet() set
-    (opt-in: SWEET_QUIET=1 is honoured here too)."""
+    Skipped on purpose: patch_mount_phase2 (opt-in) and the console bring-up job (informational)."""
     configure_paths()
     launchd(root)
-    if os.environ.get('SWEET_QUIET') == '1':
+    if quiet_enabled():
         quiet(root)
     containers(root)
     launchservices(root)
@@ -1370,7 +1378,7 @@ def main():
         sys.exit(__doc__)
     root = sys.argv[1]
     launchd(root)
-    if os.environ.get('SWEET_QUIET') == '1':
+    if quiet_enabled():
         quiet(root)
     containers(root)
     launchservices(root)
@@ -1388,7 +1396,8 @@ def main():
         'DMUserDataDisposition': {'SyntheticDidUpgrade': False, 'buildVersion': BUILD}})
     merge_pref(root, 'com.apple.springboard', {
         'BKNoWatchdogs': True,
-        'FBLaunchWatchdogExceptions': {'com.apple.purplebuddy': 100.0},
+        'FBLaunchWatchdogExceptions': {
+            'com.apple.purplebuddy': 180.0, 'Setup': 180.0},
         'MCForceShowCloudConfigurationUI': False})
     merge_pref(root, 'com.apple.purplebuddy', {
         'SetupDone': True, 'SetupFinishedAllSteps': True, 'SetupVersion': 11,
