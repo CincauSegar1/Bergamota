@@ -203,6 +203,18 @@ PATCHES = (
      bytes.fromhex('030080522400805205008052060080d203000014'),
      bytes.fromhex('3254f1171f2003d51f2003d51f2003d51f2003d5'),
      '_exit1: branch to boot task clean exit trampoline at 0x51a004 (bypasses userspace early boot task failure panic)'),
+    (0x57cf28, bytes.fromhex('ff4301d1'), bytes.fromhex('c0035fd6'),
+     '_sweet_touch_init: return immediately (do not touch beryllium GCC/TLMM 0x100000/0x3900000)'),
+    (0xb46404, bytes.fromhex('ff8301d1f65703a9'), bytes.fromhex('00008052c0035fd6'),
+     'AppleCLCD::blInit: return 0 immediately (prevent invalid PMIC SPMI read)'),
+    (0xb46f94, bytes.fromhex('ff0302d1fa6703a9'), bytes.fromhex('c0035fd61f2003d5'),
+     'AppleCLCD::blSet: return immediately (prevent invalid PMIC SPMI write)'),
+    (0xb4b554, bytes.fromhex('ff8301d1f65703a9'), bytes.fromhex('c0035fd61f2003d5'),
+     'AppleCLCD::blStep: return immediately (prevent invalid PMIC SPMI write)'),
+    (0x582aa8, bytes.fromhex('ff0302d1fc6f02a9'), bytes.fromhex('00008052c0035fd6'),
+     '_sweet_spmi_write: return 0 immediately (insulate PMIC bus from rogue writes)'),
+    (0x58270c, bytes.fromhex('ff8302d1fc6f04a9fa6705a9f85f06a9'), bytes.fromhex('420000b45f00003900008052c0035fd6'),
+     '_sweet_spmi_read: return 0 immediately with *out=0 (insulate PMIC bus from rogue reads)'),
 )
 
 
@@ -217,14 +229,6 @@ def main():
             raise SystemExit(f'{src}: {off:#x}: expected {old.hex()}, got {got.hex()} ({what})')
         data[off:off + len(new)] = new
         print(f'{off:#x}: {what}')
-
-    # Inject native Marble Goodix hardware touch driver into _touch_thread (0x57d284)
-    touch_bin = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'marble_touch.bin')
-    if os.path.exists(touch_bin):
-        touch_code = open(touch_bin, 'rb').read()
-        touch_off = 0x57d284
-        data[touch_off:touch_off + len(touch_code)] = touch_code
-        print(f'{touch_off:#x}: injected native Marble Goodix hardware touch driver ({len(touch_code)} bytes)')
 
     open(dst, 'wb').write(data)
     print(f'wrote {dst} ({len(data)} bytes)')
