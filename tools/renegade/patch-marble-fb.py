@@ -239,6 +239,18 @@ PATCHES = (
      bytes.fromhex('df26007181000054081d40f91f0118ebc0430054'),
      bytes.fromhex('081d40f91f0118ebc00d00541f2003d51f2003d5'),
      '_psignal_internal: drop all unhandled signals to initproc and jump to epilogue at 0x8e1210 (suppress SIGKILL/SIGTRAP of launchd and prevent unaligned lock abort)'),
+    (0x86a46c,
+     bytes.fromhex('40fb8f12'),
+     bytes.fromhex('00008052'),
+     '_hfs_swap_HFSPlusBTInternalNode: return 0 on invalid key length (prevent catastrophic EIO on catalog B-Tree node reads)'),
+    (0x86955c,
+     bytes.fromhex('980b0035'),
+     bytes.fromhex('1f2003d5'),
+     '_hfs_swap_BTNode: nop cbnz w24 to skip SWEET HFSINC and avoid marking filesystem inconsistent'),
+    (0x869748,
+     bytes.fromhex('e00318aa'),
+     bytes.fromhex('00008052'),
+     '_hfs_swap_BTNode: return 0 unconditionally on epilogue'),
 )
 
 
