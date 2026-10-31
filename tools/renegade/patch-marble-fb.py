@@ -227,8 +227,10 @@ PATCHES = (
      '_sweet_spmi_write: return 0 immediately (insulate PMIC bus from rogue writes)'),
     (0x58270c, bytes.fromhex('ff8302d1fc6f04a9fa6705a9f85f06a9'), bytes.fromhex('420000b45f00003900008052c0035fd6'),
      '_sweet_spmi_read: return 0 immediately with *out=0 (insulate PMIC bus from rogue reads)'),
-    (0x8e1060, bytes.fromhex('c0430054'), bytes.fromhex('800d0054'),
-     '_psignal_internal: drop SIGKILL to initproc and jump to epilogue at 0x8e1210 (suppress unexpected SIGKILL of launchd panic and prevent unaligned lock abort)'),
+    (0x8e1050,
+     bytes.fromhex('df26007181000054081d40f91f0118ebc0430054'),
+     bytes.fromhex('081d40f91f0118ebc00d00541f2003d51f2003d5'),
+     '_psignal_internal: drop all unhandled signals to initproc and jump to epilogue at 0x8e1210 (suppress SIGKILL/SIGTRAP of launchd and prevent unaligned lock abort)'),
 )
 
 
